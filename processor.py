@@ -6,6 +6,10 @@ def normalizeIssue(eventData, issueData):
 
     if eventData is not None and len(eventData["entries"]) > 0:
         dataValues = eventData["entries"][0]["data"]["values"][0] or None
+        if len(eventData["entries"]) > 1:
+            breadcrumbs = eventData["entries"][1]["data"]
+            payload["breadcrumbs"] = breadcrumbs
+            
         if dataValues is not None:
             error = {
                 "type" : dataValues["type"],
@@ -17,6 +21,7 @@ def normalizeIssue(eventData, issueData):
             payload["level"] = issueData["level"]
             payload["platform"] = eventData["platform"]
             payload["timestamp"] = eventData["dateCreated"]
+            payload["sdk"] = eventData["sdk"]
             environment = None
             release = None
 
