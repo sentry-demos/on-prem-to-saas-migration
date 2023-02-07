@@ -14,7 +14,7 @@ def normalizeIssue(eventData, issueData):
             error = {
                 "type" : dataValues["type"],
                 "value" : dataValues["value"],
-                "stacktrace" : dataValues["stacktrace"],
+                "stacktrace" : normalizeStackTrace(dataValues["stacktrace"]),
                 "mechanism" : dataValues["mechanism"]
             }
             payload["exception"]["values"] = [error]
@@ -35,5 +35,25 @@ def normalizeIssue(eventData, issueData):
             payload["release"] = environment
 
     return payload
+
+def normalizeStackTrace(stacktrace):
+    payload = {
+        "frames" : []
+    }
+
+    if "frames" in stacktrace:
+        for frame in stacktrace["frames"]:
+            obj = {}
+            obj["filename"] = frame["absPath"] or frame["filename"]
+            obj["function"] = frame["function"]
+            obj["in_app"] = frame["inApp"] or frame["in_app"]
+            obj["lineno"] = frame["lineNo"]
+            obj["colno"] = frame["colNo"]
+            payload["frames"].append(obj)
+    
+    return payload
+
+
+
 
 
