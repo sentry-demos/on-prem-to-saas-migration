@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from sentry import utils
 from request import request
+import dryable
 import os
 import time
 
@@ -60,8 +61,9 @@ class Sentry:
 
         raise Exception(f'Could not get latest event from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
 
+    @dryable.Dryable()
     def store_event(self, event):
-        store_url = f'{self.saas_options["endpoint"]}{self.saas_options["project_key"]}/store/?sentry_key={self.saas_options["key"]}'
+        store_url = f'{self.saas_options["endpoint"]}{self.saas_options["project_key"]}/store/?sentry_key={self.saas_options["sentry_key"]}'
         response = request(store_url, method = "POST", payload = event)
         if response is not None and response.status_code == 200:
             return response.json()

@@ -1,12 +1,11 @@
 from request import request
-from processor import normalizeIssue
-from dotenv import load_dotenv
+from processor import normalize_issue
 from logger import customLogger
 from sentry import Sentry
 from sentry import utils
+import dryable
 import members
-import os
-import time
+import sys
 
 class Main:
 
@@ -15,7 +14,12 @@ class Main:
             self.sentry = Sentry.Sentry()
             self.logger = customLogger.Logger()
             self.memberObj = members.Members()
-            
+            self.dry_run = utils.get_dry_run(sys.argv)
+            dryable.set(self.dry_run)
+
+            if self.dry_run:
+                self.logger.debug('Running in dry-mode')
+
             self.memberObj.populate(self.sentry.get_org_members())
             issues = self.sentry.get_issues_to_migrate()
             if issues is None or len(issues) == 0:
@@ -23,7 +27,7 @@ class Main:
             
             self.logger.debug(f'Ready to migrate {len(issues)} issues from {self.sentry.get_on_prem_project_name()} to {self.sentry.get_sass_project_name()}')
             metadata = self.create_issues_on_sass(issues)
-            self.update_issues(metadata)
+            self.print_issue_data(metadata) if self.dry_run else self.update_issues(metadata)
 
         except Exception as e:
             self.logger.critical(str(e))
@@ -69,16 +73,16 @@ class Main:
                 latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
 
                 # 3) Normalize and construct payload to send to SAAS
-                payload = normalizeIssue(latest_event, issueData)
-                if payload["exception"] is None:
-                    self.logger.error(f'Could not migrate issue with ID {issue["id"]} - Skipping...')
+                payload = normalize_issue(latest_event, issueData)
+                if payload["exception"] is None or "error" in payload:
+                    self.logger.error(payload["error"] if "error" in payload else f'Could not normalize issue payload with ID {issue["id"]} - Skipping...')
                     continue
                 
                 self.logger.info(f'Data normalized correctly for Issue with ID {issue["id"]}')
 
                 eventResponse = self.sentry.store_event(payload)
 
-                if eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None:
+                if not self.dry_run and (eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None):
                     self.logger.error(f'Could not store new event in SaaS instance - Skipping...')
                     continue
 
@@ -109,24 +113,31 @@ class Main:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 
 
-                
-                self.logger.info(f'Issue successfully created in SaaS instance with ID {eventResponse["id"]}')
-                obj = {
-                    "event_id" : eventResponse["id"],
-                    "issue_metadata" : issue_metadata
-                }
-                metadata.append(obj)
+                if self.dry_run:
+                    obj = {
+                        "issue_skeleton" : payload,
+                        "issue_metadata" : issue_metadata
+                    }
+                    metadata.append(obj)
+                else:
+                    self.logger.info(f'Issue successfully created in SaaS instance with ID {eventResponse["id"]}')
+                    obj = {
+                        "event_id" : eventResponse["id"],
+                        "issue_metadata" : issue_metadata
+                    }
+                    metadata.append(obj)
 
             else:
                 raise Exception("Issue ID not found")
 
         return metadata
 
+    def print_issue_data(self, data):
+        self.logger.debug(data, True)
+
 if __name__ == "__main__":
-    Main.init()
+    main = Main()
+    main.init()
 
-    #TODO: report of failed issue IDs
     #TODO: Implement functionality to migrate DIF/Sourcemaps?
-
-    # Input a timeframe to fetch the issues
-    # dry run mode - dont create the issue on SaaS
+    #TODO: Input a timeframe to fetch the issues

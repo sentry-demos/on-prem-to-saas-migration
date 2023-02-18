@@ -5,37 +5,68 @@ from datetime import date
 
 class Logger:
     def __init__(self):
-        self.logger = logging.getLogger("migration-script")
-        self.logger.setLevel(logging.DEBUG)
+        today = date.today()
+        self.file_name = f'{today}.txt'
+        self.cli_logger = self.get_cli_logger("migration-cli-logger")
+        self.file_logger = self.get_file_logger("migration-file-logger")
+
+    def get_cli_logger(self, logger_name):
+        cli_logger = logging.getLogger(logger_name)
+        cli_logger.setLevel(logging.DEBUG)
 
         # create console handler with a higher log level
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
 
         ch.setFormatter(customFormatter.CustomFormatter())
-        self.logger.addHandler(ch)
+        cli_logger.addHandler(ch)
 
-        today = date.today()
-        fh = logging.FileHandler(f'{today}.txt')
+        return cli_logger
+    
+    def get_file_logger(self, logger_name):
+        file_logger = logging.getLogger(logger_name)
+        file_logger.setLevel(logging.DEBUG)
+
+        
+        fh = logging.FileHandler(self.file_name)
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(fileFormatter.FileFormatter())
-        self.logger.addHandler(fh)
+        file_logger.addHandler(fh)
 
+        return file_logger
 
-       
+    def info(self, text, file_only = False):
+        self.file_logger.info(text)
+        if not file_only:
+            self.cli_logger.info(text)
+        else:
+            self.cli_logger.debug(f'Data printed in file {self.file_name}')
 
-    def info(self, text):
-        self.logger.info(text)
+    def debug(self, text, file_only = False):
+        self.file_logger.debug(text)
+        if not file_only:
+            self.cli_logger.debug(text)
+        else:
+            self.cli_logger.debug(f'Data printed in file {self.file_name}')
 
-    def debug(self, text):
-        self.logger.debug(text)
+    def warn(self, text, file_only = False):
+        self.file_logger.warning(text)
+        if not file_only:
+            self.cli_logger.warning(text)
+        else:
+            self.cli_logger.debug(f'Data printed in file {self.file_name}')
 
-    def warn(self, text):
-        self.logger.warning(text)
+    def error(self, text, file_only = False):
+        self.file_logger.error(text)
+        if not file_only:
+            self.cli_logger.error(text)
+        else:
+            self.cli_logger.debug(f'Data printed in file {self.file_name}')
 
-    def error(self, text):
-        self.logger.error(text)
-
-    def critical(self, text):
-        self.logger.critical(text)
+    def critical(self, text, file_only = False):
+        self.file_logger.critical(text)
+        if not file_only:
+            self.cli_logger.critical(text)
+        else:
+            self.cli_logger.debug(f'Data printed in file {self.file_name}')
     

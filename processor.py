@@ -1,18 +1,11 @@
-from logger import customLogger
+from sentry import utils
 
-LOGGER = None
-
-def normalizeIssue(eventData, issueData):
-    LOGGER = customLogger.Logger()
+def normalize_issue(eventData, issueData):
     payload = {
         "exception" : {}
     }
 
-    print(eventData)
-
     if eventData is not None and len(eventData["entries"]) > 0:
-        LOGGER.debug("Called")
-        LOGGER.debug("Normalizing event data")
         dataValues = eventData["entries"][0]["data"]["values"][0] or None
         if len(eventData["entries"]) > 1:
             if eventData["entries"][1]["type"] == "breadcrumbs":
@@ -24,7 +17,7 @@ def normalizeIssue(eventData, issueData):
                 error = {
                     "type" : dataValues["type"],
                     "value" : dataValues["value"],
-                    "stacktrace" : normalizeStackTrace(dataValues["stacktrace"]),
+                    "stacktrace" : normalize_stacktrace(dataValues["stacktrace"], eventData["platform"]),
                     "mechanism" : dataValues["mechanism"]
                 }
                 payload["exception"]["values"] = [error]
@@ -44,42 +37,42 @@ def normalizeIssue(eventData, issueData):
                     if attr["key"] == "release":
                         release = attr["value"]
 
-                payload["environment"] = release
-                payload["release"] = environment
+                payload["environment"] = environment
+                payload["release"] = release
             except Exception as e:
-                LOGGER.error(f'Could not normalize data - Reason: {str(e)}')
+                return {
+                    "error" : f'Could not normalize data - Reason: {str(e)} - Skipping...'
+                }
         else:
-            LOGGER.error("Event object has no data values")
+            return {
+                "error" : "Event object has no data values - Skipping..."
+            }
     else:
-        LOGGER.error("Event request did not return any data")
+        return {
+            "error" : "Event request did not return any data - Skipping..."
+        }
 
     return payload
 
-def normalizeStackTrace(stacktrace):
+def normalize_stacktrace(stacktrace, platform):
     payload = {
         "frames" : []
     }
 
     if "frames" in stacktrace:
         for frame in stacktrace["frames"]:
-            print(frame)
             obj = {}
             obj["filename"] = frame["filename"]
             obj["function"] = frame["function"]
             obj["in_app"] = frame["inApp"] or frame["in_app"]
             obj["lineno"] = frame["lineNo"]
             obj["colno"] = frame["colNo"]
-            
-            if "context" in frame and frame["context"] is not None:
-                obj["context"] = frame["context"]
-            else:
-                properties = ["pre_context", "post_context", "context_line"]
-                if all(prop in frame for prop in properties):
-                    # do nothing
-                    print(properties)
 
-            # post-processed event from sentry sends context under "context" variable but SDK should send it as ["pre_context", "post_context", "context_line"]
-
+            context_all = get_all_context_attr(frame)
+            if context_all is not None:
+                obj["pre_context"] = context_all["pre_context"]
+                obj["context_line"] = context_all["context_line"]
+                obj["post_context"] = context_all["post_context"]
             
             if "module" in frame:
                 obj["module"] = frame["module"]
@@ -99,16 +92,36 @@ def normalizeStackTrace(stacktrace):
                 obj["errors"] = frame["errors"]
             if "trust" in frame:
                 obj["trust"] = frame["trust"]
-            if "pre_context" in frame:
-                obj["pre_context"] = frame["pre_context"]
-            if "post_context" in frame:
-                obj["post_context"] = frame["post_context"]
-            if "context_line" in frame:
-                obj["context_line"] = frame["context_line"]
 
             payload["frames"].append(obj)
     
     return payload
+
+def get_all_context_attr(frame):
+    pre_context = []
+    context = None
+    post_context = []
+    if check_context_attrs(frame):
+        context_line = utils.replace_all(frame["vars"]["e"], [" ", "'", '"']).lower()
+        for line in frame["context"]:
+            formatted_str = utils.replace_all(line[1], [" ", "'", '"']).lower()
+            if context_line in formatted_str:
+                context = line[1]
+            else:
+                if context is None:
+                    pre_context.append(line[1])
+                else:
+                    post_context.append(line[1])
+        return {
+            "pre_context" : pre_context,
+            "context_line" : context,
+            "post_context" : post_context
+        }
+
+    return None
+
+def check_context_attrs(frame):
+    return ("context" in frame and frame["context"] is not None) and ("vars" in frame and frame["vars"] is not None)
 
 
 
