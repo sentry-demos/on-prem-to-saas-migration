@@ -2,10 +2,14 @@ import logging
 from logger import customFormatter
 from logger import fileFormatter
 from datetime import date
+import os
 
 class Logger:
     def __init__(self):
         today = date.today()
+        if not os.path.exists("logger/logs/"):
+            os.makedirs("logger/logs")
+            
         self.file_name = f'logger/logs/{today}.txt'
         self.cli_logger = self.get_cli_logger("migration-cli-logger")
         self.file_logger = self.get_file_logger("migration-file-logger")
