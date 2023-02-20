@@ -6,7 +6,7 @@ from datetime import date
 class Logger:
     def __init__(self):
         today = date.today()
-        self.file_name = f'{today}.txt'
+        self.file_name = f'logger/logs/{today}.txt'
         self.cli_logger = self.get_cli_logger("migration-cli-logger")
         self.file_logger = self.get_file_logger("migration-file-logger")
 
