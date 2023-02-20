@@ -15,10 +15,10 @@ def filter_issues(issues, issueIDs):
             filtered_issues.append(issue)
     return filtered_issues
 
-def get_issue_metadata(event_id, metadata):
+def get_issue_attr(event_id, metadata, attr_name):
     for data in metadata:
         if data["event_id"] == event_id:
-            return data["issue_metadata"]
+            return data[attr_name]
     return None
 
 def get_dry_run(args):

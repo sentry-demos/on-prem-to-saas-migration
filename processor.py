@@ -25,7 +25,6 @@ def normalize_issue(eventData, issueData):
                 payload["platform"] = eventData["platform"]
                 payload["timestamp"] = eventData["dateCreated"]
                 payload["sdk"] = eventData["sdk"]
-                payload["release"] = eventData["release"]["version"]
                 payload["tags"] = eventData["tags"]
                 payload["contexts"] = eventData["contexts"]
                 environment = None
@@ -64,15 +63,15 @@ def normalize_stacktrace(stacktrace, platform):
             obj = {}
             obj["filename"] = frame["filename"]
             obj["function"] = frame["function"]
-            obj["in_app"] = frame["inApp"] or frame["in_app"]
             obj["lineno"] = frame["lineNo"]
             obj["colno"] = frame["colNo"]
 
-            context_all = get_all_context_attr(frame)
-            if context_all is not None:
-                obj["pre_context"] = context_all["pre_context"]
-                obj["context_line"] = context_all["context_line"]
-                obj["post_context"] = context_all["post_context"]
+            if platform == "python":
+                context_all = get_all_context_attr(frame)
+                if context_all is not None:
+                    obj["pre_context"] = context_all["pre_context"]
+                    obj["context_line"] = context_all["context_line"]
+                    obj["post_context"] = context_all["post_context"]
             
             if "module" in frame:
                 obj["module"] = frame["module"]
@@ -92,6 +91,10 @@ def normalize_stacktrace(stacktrace, platform):
                 obj["errors"] = frame["errors"]
             if "trust" in frame:
                 obj["trust"] = frame["trust"]
+            if "inApp" in frame:
+                obj["in_app"] = frame["inApp"]
+            if "in_app" in frame and "inApp" not in frame:
+                obj["in_app"] = frame["in_app"]
 
             payload["frames"].append(obj)
     
@@ -101,22 +104,41 @@ def get_all_context_attr(frame):
     pre_context = []
     context = None
     post_context = []
-    if check_context_attrs(frame):
-        context_line = utils.replace_all(frame["vars"]["e"], [" ", "'", '"']).lower()
-        for line in frame["context"]:
-            formatted_str = utils.replace_all(line[1], [" ", "'", '"']).lower()
-            if context_line in formatted_str:
-                context = line[1]
-            else:
-                if context is None:
-                    pre_context.append(line[1])
-                else:
-                    post_context.append(line[1])
+    properties = ["pre_context", "post_context", "context_line"]
+    if all(prop in frame for prop in properties):
         return {
-            "pre_context" : pre_context,
-            "context_line" : context,
-            "post_context" : post_context
+            "pre_context" : frame["pre_context"],
+            "context_line" : frame["context_line"],
+            "post_context" : frame["post_context"]
         }
+
+    if check_context_attrs(frame):
+        if ("e" in frame["vars"]) or ("err" in frame["vars"]):
+            error_line = frame["vars"]["e"] if "e" in frame["vars"] else frame["vars"]["err"]
+            context_line = utils.replace_all(error_line, [" ", "'", '"']).lower()
+            for line in frame["context"]:
+                formatted_str = utils.replace_all(line[1], [" ", "'", '"']).lower()
+                if context_line in formatted_str:
+                    context = line[1]
+                else:
+                    if context is None:
+                        pre_context.append(line[1])
+                    else:
+                        post_context.append(line[1])
+            return {
+                "pre_context" : pre_context,
+                "context_line" : context,
+                "post_context" : post_context
+            }
+        else:
+            #try to guess context line
+            length = len(frame["context"])
+
+            return {
+                "pre_context": frame["context"][:round(length / 2) -1],
+                "context_line": frame["context"][round(length/2) -1],
+                "post_context": frame["context"][round(length / 2):]
+            }
 
     return None
 

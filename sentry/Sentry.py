@@ -87,24 +87,69 @@ class Sentry:
             response = request(url, method = "GET")
             start_time = time.time()
             if response is not None and response.status_code == 200:
-                while "id" not in response.json():
+                data = response.json()
+                while "id" not in data:
                     time_delta = time.time() - start_time
                     response = request(url, method = "GET")
+                    data = response.json()
 
                     if time_delta > self.request_timeout:
                         failed_event_ids.append(eventID)
                         continue
 
-            if "groupID" in response:
-                issues.append({
-                    "issue_id" : response["groupID"],
-                    "event_id" : eventID
+                if "groupID" in data:
+                    issues.append({
+                        "issue_id" : data["groupID"],
+                        "event_id" : eventID
                     })
 
         return {
             "issues" : issues,
             "failed_event_ids" : failed_event_ids
         }
+
+    def get_integration_data(self, integration_name, issue_id):
+        url = f'{self.on_prem_options["url"]}groups/{issue_id}/integrations/'
+        response = request(url, method = "GET")
+        if response is not None and response.status_code == 200:
+            return self.process_integrations_response(response.json(), integration_name)
+        
+        raise Exception(f'Could not fetch integrations for issue with ID {issue_id}')
+    
+    def process_integrations_response(self, integrations, integration_name):
+        keys = {
+            "domain_name" : None,
+            "external_issue" : None
+        }
+        for integration in integrations:
+            if "name" in integration and integration["name"] == integration_name:
+                if len(integration["externalIssues"]) > 0:
+                    keys["domain_name"] = integration["domainName"] or None
+                    keys["external_issue"] = integration["externalIssues"][0]["key"] or None
+        return keys
+
+    def get_saas_integration_id(self, integration_name, identifer):
+        url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/integrations/?includeConfig=0'
+        response = request(url, method = "GET")
+        if response is not None and response.status_code in [200,201]:
+            data = response.json()
+            for integration in data:
+                if integration["name"] == integration_name and integration[identifer["key"]] == identifer["value"]:
+                    return integration["id"] or None
+
+        raise Exception(f'Could not get integration id for {integration_name} in SaaS {self.saas_options["org_name"]}')
+
+    def update_external_issues(self, issue_id, integration_data, integration_id):
+        url = f'{self.saas_options["url"]}groups/{issue_id}/integrations/{integration_id}/'
+        payload = {
+            "externalIssue" : integration_data["external_issue"]
+        }
+        response = request(url, method = "PUT", payload = payload)
+        if response is not None and response.status_code in [200,201]:
+            return response.json()
+
+        raise Exception(f'Could not update SaaS issue with ID {issue_id} with external issue with ID {integration_data["external_issue"]}')
+
 
 
 

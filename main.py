@@ -36,7 +36,7 @@ class Main:
         event_ids = [data["event_id"] for data in metadata]
         response = self.sentry.get_issue_ids_from_events(event_ids)
         if len(response["failed_event_ids"]) > 0:
-            self.logger.warn(f'Could not find events with IDs {print(response["failed_event_ids"])} in {self.sentry.get_sass_project_name()} SaaS')
+            self.logger.warn(f'Could not find events with IDs {str(response["failed_event_ids"])} in {self.sentry.get_sass_project_name()} SaaS')
         
         if len(response["issues"]) == 0:
             self.logger.warn(f'Could not find new IDs in {self.sentry.get_sass_project_name()} SaaS')
@@ -45,7 +45,8 @@ class Main:
         for issue in response["issues"]:
             issue_id = issue["issue_id"]
             event_id = issue["event_id"]
-            issue_metadata = utils.get_issue_metadata(event_id, metadata)
+            issue_metadata = utils.get_issue_attr(event_id, metadata, "issue_metadata")
+            integration_data = utils.get_issue_attr(event_id, metadata, "integration_data")
 
             if issue_metadata is None:
                 self.logger.warn(f'Could not update SaaS issue with ID {issue_id} (Issue created but not updated) - Skipping...')
@@ -53,9 +54,19 @@ class Main:
             
             response = self.sentry.update_issue(issue_id, issue_metadata)
             if "id" in response:
-                self.logger.info(f'SaaS Issue with ID {issue_id} updated succesfully!')
+                self.logger.info(f'SaaS Issue with ID {issue_id} metadata updated succesfully!')
             else:
-                self.logger.error(f'SaaS Issue with ID {issue_id} could not be updated')
+                self.logger.error(f'SaaS Issue with ID {issue_id} metadata could not be updated')
+
+            if integration_data["external_issue"] is not None:
+                saas_integration_id = self.sentry.get_saas_integration_id("JIRA", {"key": "domainName", "value" : integration_data["domain_name"]})
+                external_issues_response = self.sentry.update_external_issues(issue_id, integration_data, saas_integration_id)
+                if "id" in external_issues_response and external_issues_response["id"] is not None:
+                    self.logger.info(f'SaaS Issue with ID {issue_id} external issues updated succesfully!')
+                else:
+                    self.logger.error(f'SaaS Issue with ID {issue_id} external issues could not be updated')
+            else:
+                self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
 
     def create_issues_on_sass(self, issues):
         metadata = []
@@ -74,7 +85,7 @@ class Main:
 
                 # 3) Normalize and construct payload to send to SAAS
                 payload = normalize_issue(latest_event, issueData)
-                if payload["exception"] is None or "error" in payload:
+                if ("error" in payload) or ("exception" in payload and payload["exception"] is None):
                     self.logger.error(payload["error"] if "error" in payload else f'Could not normalize issue payload with ID {issue["id"]} - Skipping...')
                     continue
                 
@@ -87,6 +98,7 @@ class Main:
                     continue
 
                 issue_metadata = {}
+                integration_data = {}
 
                 if "firstSeen" in issue and issue["firstSeen"] is not None:
                     issue_metadata["firstSeen"] = issue["firstSeen"]
@@ -112,18 +124,21 @@ class Main:
                 else:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 
+                integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
 
                 if self.dry_run:
                     obj = {
                         "issue_skeleton" : payload,
-                        "issue_metadata" : issue_metadata
+                        "issue_metadata" : issue_metadata,
+                        "integration_data" : integration_data
                     }
                     metadata.append(obj)
                 else:
                     self.logger.info(f'Issue successfully created in SaaS instance with ID {eventResponse["id"]}')
                     obj = {
                         "event_id" : eventResponse["id"],
-                        "issue_metadata" : issue_metadata
+                        "issue_metadata" : issue_metadata,
+                        "integration_data" : integration_data
                     }
                     metadata.append(obj)
 
