@@ -11,17 +11,29 @@ class Main:
 
     def init(self):
         try:
+            
             self.sentry = Sentry.Sentry()
             self.logger = customLogger.Logger()
             self.memberObj = members.Members()
-            self.dry_run = utils.get_dry_run(sys.argv)
+
+            cli_args = utils.process_cli_args(sys.argv, self.logger)
+
+            if cli_args == False:
+                return
+
+            self.dry_run = "dry-run" in cli_args
             dryable.set(self.dry_run)
 
             if self.dry_run:
                 self.logger.debug('Running in dry-mode')
-
+            
             self.memberObj.populate(self.sentry.get_org_members())
-            issues = self.sentry.get_issues_to_migrate()
+
+            filters = utils.get_request_filters(sys.argv, self.logger)
+            if filters is None:
+                raise Exception("Invalid CLI arguments")
+
+            issues = self.sentry.get_issues_to_migrate(filters)
             if issues is None or len(issues) == 0:
                 raise Exception("Issues list is empty")
             
@@ -153,6 +165,3 @@ class Main:
 if __name__ == "__main__":
     main = Main()
     main.init()
-
-    #TODO: Implement functionality to migrate DIF/Sourcemaps?
-    #TODO: Input a timeframe to fetch the issues

@@ -42,13 +42,11 @@ class Sentry:
 
         raise Exception(f'Could not fetch {self.saas_options["org_name"]} members')
 
-    def get_issues_to_migrate(self):
-        issue_list = os.environ["ISSUES"]
-        if issue_list is not None:
-            url = f'{self.on_prem_options["url"]}projects/{self.on_prem_options["org_name"]}/{self.on_prem_options["project_name"]}/issues/'
-            response = request(url, method = "GET")
-            if response is not None and response.status_code == 200:
-                return utils.filter_issues(response.json(), issue_list)
+    def get_issues_to_migrate(self, filters):
+        url = f'{self.on_prem_options["url"]}projects/{self.on_prem_options["org_name"]}/{self.on_prem_options["project_name"]}/issues/'
+        response = request(url, method = "GET")
+        if response is not None and response.status_code == 200:
+            return utils.filter_issues(response.json(), filters)
 
         raise Exception(f'Could not get issues from on-prem {self.on_prem_options["project_name"]}')
 
