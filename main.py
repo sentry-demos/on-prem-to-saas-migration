@@ -21,7 +21,7 @@ class Main:
             if cli_args == False:
                 return
 
-            self.dry_run = "dry-run" in cli_args
+            self.dry_run = "--dry-run" in cli_args
             dryable.set(self.dry_run)
 
             if self.dry_run:
