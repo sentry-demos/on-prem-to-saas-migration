@@ -13,8 +13,8 @@ class Main:
     def init(self):
         try:
             
-            self.sentry = Sentry.Sentry()
             self.logger = customLogger.Logger()
+            self.sentry = Sentry.Sentry()
             self.memberObj = members.Members()
             self.migration_id = uuid.uuid4()
 

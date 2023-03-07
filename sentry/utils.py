@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 
 def get_attributes_from_dsn(dsn):
     if dsn is not None:
-        dsn_string = re.search(".*?\/\/(.*)@.*\/(.*)", dsn)
+        dsn_string = re.search(".*?\/\/(.*)@(.*)\/(.*)", dsn)
         if dsn_string is not None:
-            if len(dsn_string.groups()) == 2:
+            if len(dsn_string.groups()) == 3:
                 return dsn_string
     raise Exception("Could no retrieve project key")
 

@@ -12,13 +12,13 @@ class Sentry:
         self.request_timeout = 15
         attributes = utils.get_attributes_from_dsn(os.environ["SAAS_PROJECT_DSN"])
         self.saas_options = {
-            "endpoint" : os.environ["INGEST_SAAS_ENDPOINT"],
+            "endpoint" : f'https://{attributes.group(2)}/api/',
             "url" : os.environ["SAAS_URL"],
             "auth_token" : os.environ["SAAS_AUTH_TOKEN"],
             "org_name" : os.environ["SAAS_ORG_NAME"],
             "project_name" : os.environ["SAAS_PROJECT_NAME"],
             "sentry_key" : attributes.group(1),
-            "project_key" : attributes.group(2)
+            "project_key" : attributes.group(3)
         }
 
         self.on_prem_options = {
