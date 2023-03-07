@@ -42,10 +42,13 @@ class Main:
             self.logger.debug(f'Ready to migrate {len(issues)} issues from {self.sentry.get_on_prem_project_name()} to {self.sentry.get_sass_project_name()}')
             metadata = self.create_issues_on_sass(issues)
             if metadata is not None:
-                self.print_issue_data(metadata) if self.dry_run else self.update_issues(metadata)
-
-                discover_query = self.sentry.build_discover_query(self.migration_id)
-                self.logger.debug(f'Issues migrated discover query {discover_query}')
+                if self.dry_run:
+                    self.print_issue_data(metadata)
+                else:
+                    self.update_issues(metadata)
+                
+                    discover_query = self.sentry.build_discover_query(self.migration_id)
+                    self.logger.debug(f'Issues migrated discover query {discover_query}')
 
         except Exception as e:
             self.logger.critical(str(e))
