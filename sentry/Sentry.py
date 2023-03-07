@@ -35,7 +35,7 @@ class Sentry:
         return self.on_prem_options["project_name"]
 
     def get_org_members(self):
-        url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/members/'
+        url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/users/'
         response = request(url, method = "GET")
         if response is not None and response.status_code == 200:
             return response.json()
