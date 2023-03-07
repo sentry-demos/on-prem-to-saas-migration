@@ -6,6 +6,7 @@ from sentry import utils
 import dryable
 import members
 import sys
+import uuid
 
 class Main:
 
@@ -15,6 +16,7 @@ class Main:
             self.sentry = Sentry.Sentry()
             self.logger = customLogger.Logger()
             self.memberObj = members.Members()
+            self.migration_id = uuid.uuid4()
 
             cli_args = utils.process_cli_args(sys.argv, self.logger)
 
@@ -39,7 +41,11 @@ class Main:
             
             self.logger.debug(f'Ready to migrate {len(issues)} issues from {self.sentry.get_on_prem_project_name()} to {self.sentry.get_sass_project_name()}')
             metadata = self.create_issues_on_sass(issues)
-            self.print_issue_data(metadata) if self.dry_run else self.update_issues(metadata)
+            if metadata is not None:
+                self.print_issue_data(metadata) if self.dry_run else self.update_issues(metadata)
+
+                discover_query = self.sentry.build_discover_query(self.migration_id)
+                self.logger.debug(f'Issues migrated discover query {discover_query}')
 
         except Exception as e:
             self.logger.critical(str(e))
@@ -63,22 +69,25 @@ class Main:
             if issue_metadata is None:
                 self.logger.warn(f'Could not update SaaS issue with ID {issue_id} (Issue created but not updated) - Skipping...')
                 continue
-            
-            response = self.sentry.update_issue(issue_id, issue_metadata)
-            if "id" in response:
-                self.logger.info(f'SaaS Issue with ID {issue_id} metadata updated succesfully!')
-            else:
-                self.logger.error(f'SaaS Issue with ID {issue_id} metadata could not be updated')
 
-            if integration_data["external_issue"] is not None:
-                saas_integration_id = self.sentry.get_saas_integration_id("JIRA", {"key": "domainName", "value" : integration_data["domain_name"]})
-                external_issues_response = self.sentry.update_external_issues(issue_id, integration_data, saas_integration_id)
-                if "id" in external_issues_response and external_issues_response["id"] is not None:
-                    self.logger.info(f'SaaS Issue with ID {issue_id} external issues updated succesfully!')
-                else:
-                    self.logger.error(f'SaaS Issue with ID {issue_id} external issues could not be updated')
+            self.update_issue_metadata(issue_id, issue_metadata, integration_data)
+    
+    def update_issue_metadata(self, issue_id, issue_metadata, integration_data):
+        response = self.sentry.update_issue(issue_id, issue_metadata)
+        if "id" in response:
+            self.logger.info(f'SaaS Issue with ID {issue_id} metadata updated succesfully!')
+        else:
+            self.logger.error(f'SaaS Issue with ID {issue_id} metadata could not be updated')
+
+        if integration_data["external_issue"] is not None:
+            saas_integration_id = self.sentry.get_saas_integration_id("JIRA", {"key": "domainName", "value" : integration_data["domain_name"]})
+            external_issues_response = self.sentry.update_external_issues(issue_id, integration_data, saas_integration_id)
+            if "id" in external_issues_response and external_issues_response["id"] is not None:
+                self.logger.info(f'SaaS Issue with ID {issue_id} external issues updated succesfully!')
             else:
-                self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
+                self.logger.error(f'SaaS Issue with ID {issue_id} external issues could not be updated')
+        else:
+            self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
 
     def create_issues_on_sass(self, issues):
         metadata = []
@@ -87,7 +96,9 @@ class Main:
                 self.logger.debug(f'Fetching data from issue with ID {issue["id"]}')
                 if "level" in issue:
                     issueData = {
-                        "level" : issue["level"] or "error"
+                        "level" : issue["level"] or "error",
+                        "id" : issue["id"],
+                        "migration_id" : str(self.migration_id)
                     }
                 else:
                     self.logger.warn("No level attribute found in issue data object")
@@ -103,11 +114,20 @@ class Main:
                 
                 self.logger.info(f'Data normalized correctly for Issue with ID {issue["id"]}')
 
-                eventResponse = self.sentry.store_event(payload)
+                existingEvent = self.sentry.get_issue_by_id(issue["id"])
+                existingIssueID = None
+                if len(existingEvent["data"]) > 0:
+                    existingId = existingEvent["data"][0]["id"]
+                    issue_response = self.sentry.get_issue_id_from_event_id(existingId)
+                    if "groupID" in issue_response:
+                        existingIssueID = issue_response["groupID"]
 
-                if not self.dry_run and (eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None):
-                    self.logger.error(f'Could not store new event in SaaS instance - Skipping...')
-                    continue
+                else:
+                    eventResponse = self.sentry.store_event(payload)
+
+                    if not self.dry_run and (eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None):
+                        self.logger.error(f'Could not store new event in SaaS instance - Skipping...')
+                        continue
 
                 issue_metadata = {}
                 integration_data = {}
@@ -137,6 +157,11 @@ class Main:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 
                 integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
+
+                if existingIssueID is not None:
+                    self.logger.debug(f'Issue already created in SaaS instance with ID {existingIssueID} - Only updating issue with metadata')
+                    self.update_issue_metadata(existingIssueID, issue_metadata, integration_data)
+                    return None
 
                 if self.dry_run:
                     obj = {

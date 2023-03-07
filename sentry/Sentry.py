@@ -9,7 +9,7 @@ class Sentry:
 
     def __init__(self):
         load_dotenv()
-        self.request_timeout = 5
+        self.request_timeout = 15
         attributes = utils.get_attributes_from_dsn(os.environ["SAAS_PROJECT_DSN"])
         self.saas_options = {
             "endpoint" : os.environ["INGEST_SAAS_ENDPOINT"],
@@ -49,6 +49,15 @@ class Sentry:
             return utils.filter_issues(response.json(), filters)
 
         raise Exception(f'Could not get issues from on-prem {self.on_prem_options["project_name"]}')
+    
+    def get_issue_by_id(self, issue_id):
+        if id is not None:
+            url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/events/?query=onprem_id:{issue_id}&field=id'
+            response = request(url, method = "GET")
+            if response is not None and response.status_code == 200:
+                return response.json()
+
+        raise Exception(f'Could not check if issue already exists with on prem id {issue_id}')
 
     def get_latest_event_from_issue(self, id):
         if id is not None:
@@ -58,6 +67,16 @@ class Sentry:
                 return response.json()
 
         raise Exception(f'Could not get latest event from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
+
+    def get_issue_id_from_event_id(self, event_id):
+        if id is not None:
+            url = f'{self.saas_options["url"]}projects/{self.saas_options["org_name"]}/{self.saas_options["project_name"]}/events/{event_id}/'
+            response = request(url, method = "GET")
+            if response is not None and response.status_code == 200:
+                return response.json()
+
+        raise Exception(f'Could not get issue info from SaaS event with ID {event_id}')
+
 
     @dryable.Dryable()
     def store_event(self, event):
@@ -147,6 +166,10 @@ class Sentry:
             return response.json()
 
         raise Exception(f'Could not update SaaS issue with ID {issue_id} with external issue with ID {integration_data["external_issue"]}')
+
+    def build_discover_query(self, migration_id):
+        url = f'https://{self.saas_options["org_name"]}.sentry.io/issues/?query=+migration_id%3A{migration_id}&referrer=issue-list&statsPeriod=90d'
+        return url
 
 
 

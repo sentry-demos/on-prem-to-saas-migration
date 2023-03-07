@@ -25,7 +25,9 @@ def normalize_issue(eventData, issueData):
                 payload["platform"] = eventData["platform"]
                 payload["timestamp"] = eventData["dateCreated"]
                 payload["sdk"] = eventData["sdk"]
-                payload["tags"] = eventData["tags"]
+                payload["tags"] = normalize_tags(eventData["tags"])
+                payload["tags"]["onprem_id"] = issueData["id"]
+                payload["tags"]["migration_id"] = issueData["migration_id"]
                 payload["contexts"] = eventData["contexts"]
                 environment = None
                 release = None
@@ -52,6 +54,13 @@ def normalize_issue(eventData, issueData):
         }
 
     return payload
+
+def normalize_tags(tags):
+    obj = {}
+    if tags is not None and len(tags) > 0:
+        for tag in tags:
+            obj[tag["key"]] = tag["value"]
+    return obj
 
 def normalize_stacktrace(stacktrace, platform):
     payload = {
