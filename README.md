@@ -58,7 +58,7 @@ The script will accept different CLI arguments at the time of calling `main.py`.
 There are 2 ways that you can specify the criteria that are used to fetch issues from an on-prem instance:
 
 1. Specify arguments via the CLI when you run the `main.py` script. Arguments like:
-	- `--issues` = A list of issues that will be fetched from an on-prem instance. (E.g `--issues=1,2,3`)
+	- `--issues` = A list of issues that will be fetched from an on-prem instance. (E.g `--issues 1,2,3`)
 	- `--start` = (`YYYY-mm-dd`) ISO Start date when issues are going to be fetched from an on-prem instance - This value can't be older than 90 days (If this argument is specified, then the `--end` argument has to also be specified)
 	- `--end` = (`YYYY-mm-dd`) ISO End date when issues are going to be fetched from an on-prem instance. (If this argument is specified, then the `--start` argument has to also be specified)
 	
