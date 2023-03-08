@@ -16,6 +16,7 @@ For this script to run, please make sure you have the following env variables:
 Run `bash install.sh` to check python version as well as create virtual environment
 
 Go into the virtual env by running `source venv/bin/activate`
+
 Run `bash run.sh` to start the migration process.
 
 **NOTE:** The auth token will need the following permissions:
