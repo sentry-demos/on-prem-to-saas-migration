@@ -42,6 +42,14 @@ class Sentry:
 
         raise Exception(f'Could not fetch {self.saas_options["org_name"]} members')
 
+    def get_org_teams(self):
+        url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/teams/'
+        response = request(url, method = "GET")
+        if response is not None and response.status_code == 200:
+            return response.json()
+
+        raise Exception(f'Could not fetch {self.saas_options["org_name"]} teams')
+
     def get_issues_to_migrate(self, filters):
         url = f'{self.on_prem_options["url"]}projects/{self.on_prem_options["org_name"]}/{self.on_prem_options["project_name"]}/issues/'
         response = request(url, method = "GET")

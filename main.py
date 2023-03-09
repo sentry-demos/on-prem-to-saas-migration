@@ -29,7 +29,8 @@ class Main:
             if self.dry_run:
                 self.logger.debug('Running in dry-mode')
             
-            self.memberObj.populate(self.sentry.get_org_members())
+            self.memberObj.populate_members(self.sentry.get_org_members())
+            self.memberObj.populate_teams(self.sentry.get_org_teams())
 
             filters = utils.get_request_filters(sys.argv, self.logger)
             if filters is None:
@@ -146,16 +147,23 @@ class Main:
                     self.logger.warn(f'lastSeen property could not be added to SaaS issue with ID {issue["id"]}')
                 
                 if "assignedTo" in issue and issue["assignedTo"] is not None:
-                    if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
+                  if issue["assignedTo"]["type"] == "team":
+                     team_name = issue["assignedTo"]["name"]
+                     team_id = self.memberObj.getTeamID(team_name)
+                     if team_id is not None:
+                        issue_metadata["assignedBy"] = "assignee_selector"
+                        issue_metadata["assignedTo"] = "team:" + team_id
+                  elif issue["assignedTo"]["type"] == "user":
+                     if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
                         self.logger.warn(f'Issue assignee\'s email from on-prem issue with ID {issue["id"]} was not found')
-                    else:
+                     else:
                         userEmail = issue["assignedTo"]["email"]
                         userId = self.memberObj.getUserID(userEmail)
                         if userId is not None:
-                            issue_metadata["assignedBy"] = "assignee_selector"
-                            issue_metadata["assignedTo"] = "user:" + userId
+                           issue_metadata["assignedBy"] = "assignee_selector"
+                           issue_metadata["assignedTo"] = "user:" + userId
                         else:
-                            self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
+                           self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
                 else:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 

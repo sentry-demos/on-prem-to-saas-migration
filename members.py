@@ -1,7 +1,10 @@
 class Members:
 
-    def populate(self, members):
+    def populate_members(self, members):
         self.members = members
+
+    def populate_teams(self, teams):
+        self.teams = teams
 
     def getUserID(self, email):
         if email is not None:
@@ -9,6 +12,15 @@ class Members:
                 if member["email"] == email:
                     return member["user"]["id"]
         return None
+
+    def getTeamID(self, name):
+        if name is not None:
+            for team in self.teams:
+                if team["name"] == name:
+                    return team["id"]
+
+        return None
+
 
     def print(self):
         print(self.members)
