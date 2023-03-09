@@ -6,7 +6,8 @@ def normalize_issue(eventData, issueData):
     }
 
     if eventData is not None and len(eventData["entries"]) > 0:
-        dataValues = eventData["entries"][0]["data"]["values"][0] or None
+        exception = utils.filter_exception(eventData["entries"])
+        dataValues = exception["data"]["values"][0] or None
         if len(eventData["entries"]) > 1:
             if eventData["entries"][1]["type"] == "breadcrumbs":
                 breadcrumbs = eventData["entries"][1]["data"]

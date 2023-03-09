@@ -11,6 +11,12 @@ def get_attributes_from_dsn(dsn):
                 return dsn_string
     raise Exception("Could no retrieve project key")
 
+def filter_exception(event_data):
+    for data in event_data:
+        if data["type"] == "exception":
+            return data
+    return []
+
 def filter_issues(issues, filters):
     if filters is None:
         return issues
