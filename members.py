@@ -16,7 +16,7 @@ class Members:
     def getTeamID(self, name):
         if name is not None:
             for team in self.teams:
-                if team["name"] == name:
+                if team["slug"].tolower() == name.tolower() or team["name"].tolower() == name.tolower():
                     return team["id"]
 
         return None

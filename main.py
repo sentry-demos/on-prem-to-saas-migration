@@ -101,6 +101,8 @@ class Main:
                 if "level" in issue:
                     issueData = {
                         "level" : issue["level"] or "error",
+                        "firstSeen" : issue["firstSeen"],
+                        "lastSeen" : issue["lastSeen"],
                         "id" : issue["id"],
                         "migration_id" : str(self.migration_id)
                     }

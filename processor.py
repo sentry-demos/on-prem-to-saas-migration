@@ -29,7 +29,14 @@ def normalize_issue(eventData, issueData):
                 payload["tags"] = normalize_tags(eventData["tags"])
                 payload["tags"]["onprem_id"] = issueData["id"]
                 payload["tags"]["migration_id"] = issueData["migration_id"]
+                payload["tags"]["firstSeen"] = eventData["dateCreated"]
                 payload["contexts"] = eventData["contexts"]
+                timestamps = {
+                    "firstSeen" : issueData["firstSeen"],
+                    "lastSeen" : issueData["lastSeen"],
+                    "realTimestamp" : eventData["dateCreated"]
+                }
+                payload["contexts"]["timestamps"] = timestamps
                 environment = None
                 release = None
 

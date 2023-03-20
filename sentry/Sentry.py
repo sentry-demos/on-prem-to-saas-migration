@@ -9,7 +9,7 @@ class Sentry:
 
     def __init__(self):
         load_dotenv()
-        self.request_timeout = 15
+        self.request_timeout = 30
         attributes = utils.get_attributes_from_dsn(os.environ["SAAS_PROJECT_DSN"])
         self.saas_options = {
             "endpoint" : f'https://{attributes.group(2)}/api/',
@@ -80,6 +80,8 @@ class Sentry:
         if id is not None:
             url = f'{self.saas_options["url"]}projects/{self.saas_options["org_name"]}/{self.saas_options["project_name"]}/events/{event_id}/'
             response = request(url, method = "GET")
+            print(url)
+            print(response.json())
             if response is not None and response.status_code == 200:
                 return response.json()
 
@@ -98,6 +100,9 @@ class Sentry:
     def update_issue(self, issue_id, payload):
         url = f'{self.saas_options["url"]}issues/{issue_id}/'
         response = request(url = url, method = "PUT", payload = payload)
+        print(url)
+        print(payload)
+        print(response.json())
         if response is not None and response.status_code == 200:
             return response.json()
         
@@ -142,12 +147,13 @@ class Sentry:
         raise Exception(f'Could not fetch integrations for issue with ID {issue_id}')
     
     def process_integrations_response(self, integrations, integration_name):
+        print(integrations)
         keys = {
             "domain_name" : None,
             "external_issue" : None
         }
         for integration in integrations:
-            if "name" in integration and integration["name"] == integration_name:
+            if "name" in integration and integration["name"].lower() == integration_name.lower():
                 if len(integration["externalIssues"]) > 0:
                     keys["domain_name"] = integration["domainName"] or None
                     keys["external_issue"] = integration["externalIssues"][0]["key"] or None
@@ -159,7 +165,7 @@ class Sentry:
         if response is not None and response.status_code in [200,201]:
             data = response.json()
             for integration in data:
-                if integration["name"] == integration_name and integration[identifer["key"]] == identifer["value"]:
+                if integration["name"].lower() == integration_name.lower() and integration[identifer["key"]] == identifer["value"]:
                     return integration["id"] or None
 
         raise Exception(f'Could not get integration id for {integration_name} in SaaS {self.saas_options["org_name"]}')
