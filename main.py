@@ -98,6 +98,8 @@ class Main:
         for issue in issues:
             if issue["id"] is not None:
                 self.logger.debug(f'Fetching data from issue with ID {issue["id"]}')
+                print(issue)
+                print("============================")
                 if "level" in issue:
                     issueData = {
                         "level" : issue["level"] or "error",
@@ -111,6 +113,7 @@ class Main:
 
                 # 2) Get the latest event for each of the issues
                 latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+                print(latest_event)
 
                 # 3) Normalize and construct payload to send to SAAS
                 payload = normalize_issue(latest_event, issueData)
