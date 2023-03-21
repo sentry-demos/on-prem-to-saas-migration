@@ -80,8 +80,6 @@ class Sentry:
         if id is not None:
             url = f'{self.saas_options["url"]}projects/{self.saas_options["org_name"]}/{self.saas_options["project_name"]}/events/{event_id}/'
             response = request(url, method = "GET")
-            print(url)
-            print(response.json())
             if response is not None and response.status_code == 200:
                 return response.json()
 
@@ -100,9 +98,6 @@ class Sentry:
     def update_issue(self, issue_id, payload):
         url = f'{self.saas_options["url"]}issues/{issue_id}/'
         response = request(url = url, method = "PUT", payload = payload)
-        print(url)
-        print(payload)
-        print(response.json())
         if response is not None and response.status_code == 200:
             return response.json()
         
@@ -124,6 +119,7 @@ class Sentry:
                     data = response.json()
 
                     if time_delta > self.request_timeout:
+                        print("Timeout reached")
                         failed_event_ids.append(eventID)
                         continue
 
@@ -147,7 +143,6 @@ class Sentry:
         raise Exception(f'Could not fetch integrations for issue with ID {issue_id}')
     
     def process_integrations_response(self, integrations, integration_name):
-        print(integrations)
         keys = {
             "domain_name" : None,
             "external_issue" : None

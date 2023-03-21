@@ -32,6 +32,7 @@ def normalize_issue(eventData, issueData):
                 payload["tags"]["firstSeen"] = issueData['firstSeen']
                 payload["tags"]["migrated"] = "true"
                 payload["contexts"] = eventData["contexts"]
+                payload["message"] = eventData["message"] if "message" in eventData else ""
                 timestamps = {
                     "firstSeen" : issueData["firstSeen"],
                     "lastSeen" : issueData["lastSeen"],
