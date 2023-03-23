@@ -13,7 +13,7 @@ def get_attributes_from_dsn(dsn):
 
 def filter_exception(event_data):
     for data in event_data:
-        if data["type"] == "exception":
+        if data["type"] == "exception" or data["type"] == "stacktrace":
             return data
     return []
 

@@ -143,6 +143,10 @@ class Sentry:
         raise Exception(f'Could not fetch integrations for issue with ID {issue_id}')
     
     def process_integrations_response(self, integrations, integration_name):
+        print("==========================================================")
+        print(integrations)
+        print("==========================================================")
+
         keys = {
             "domain_name" : None,
             "external_issue" : None

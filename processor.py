@@ -7,56 +7,73 @@ def normalize_issue(eventData, issueData):
 
     if eventData is not None and len(eventData["entries"]) > 0:
         exception = utils.filter_exception(eventData["entries"])
-        dataValues = exception["data"]["values"][0] or None
-        if len(eventData["entries"]) > 1:
-            if eventData["entries"][1]["type"] == "breadcrumbs":
-                breadcrumbs = eventData["entries"][1]["data"]
-                payload["breadcrumbs"] = breadcrumbs
+
+        if exception is not None:
+            if exception["type"] == "stacktrace":
+                dataValues = exception["data"]["frames"] or None
+            elif exception["type"] == "exception":
+                dataValues = exception["data"]["values"][0] or None
+                if len(eventData["entries"]) > 1:
+                    if eventData["entries"][1]["type"] == "breadcrumbs":
+                        breadcrumbs = eventData["entries"][1]["data"]
+                        payload["breadcrumbs"] = breadcrumbs
             
-        if dataValues is not None:
-            try:
-                error = {
-                    "type" : dataValues["type"],
-                    "value" : dataValues["value"],
-                    "stacktrace" : normalize_stacktrace(dataValues["stacktrace"], eventData["platform"]),
-                    "mechanism" : dataValues["mechanism"]
-                }
-                payload["exception"]["values"] = [error]
-                payload["level"] = issueData["level"]
-                payload["platform"] = eventData["platform"]
-                payload["timestamp"] = eventData["dateCreated"]
-                payload["sdk"] = eventData["sdk"]
-                payload["tags"] = normalize_tags(eventData["tags"])
-                payload["tags"]["onprem_id"] = issueData["id"]
-                payload["tags"]["migration_id"] = issueData["migration_id"]
-                payload["tags"]["firstSeen"] = issueData['firstSeen']
-                payload["tags"]["migrated"] = "true"
-                payload["contexts"] = eventData["contexts"]
-                payload["message"] = eventData["message"] if "message" in eventData else ""
-                timestamps = {
-                    "firstSeen" : issueData["firstSeen"],
-                    "lastSeen" : issueData["lastSeen"],
-                    "realTimestamp" : eventData["dateCreated"]
-                }
-                payload["contexts"]["timestamps"] = timestamps
-                environment = None
-                release = None
+            if dataValues is not None:
+                try:
+                    if exception["type"] == "exception":
+                        error = {
+                            "type" : dataValues["type"],
+                            "value" : dataValues["value"],
+                            "stacktrace" : normalize_stacktrace(dataValues["stacktrace"], eventData["platform"]),
+                            "mechanism" : dataValues["mechanism"]
+                        }
+                    else:
+                        error = {
+                            "type" : exception["type"],
+                            "value" : eventData["title"] or eventData["message"],
+                            "stacktrace" : normalize_stacktrace(dataValues, eventData["platform"])
+                        }
 
-                for attr in eventData["tags"] : 
-                    if attr["key"] == "environment" :
-                        environment = attr["value"]
-                    if attr["key"] == "release":
-                        release = attr["value"]
+                    payload["exception"]["values"] = [error]
+                    payload["level"] = issueData["level"]
+                    payload["platform"] = eventData["platform"]
+                    payload["timestamp"] = eventData["dateCreated"]
+                    payload["sdk"] = eventData["sdk"]
+                    payload["tags"] = normalize_tags(eventData["tags"])
+                    payload["tags"]["onprem_id"] = issueData["id"]
+                    payload["tags"]["migration_id"] = issueData["migration_id"]
+                    payload["tags"]["firstSeen"] = issueData['firstSeen']
+                    payload["tags"]["migrated"] = "true"
+                    payload["contexts"] = eventData["contexts"]
+                    payload["message"] = eventData["message"] if "message" in eventData else ""
+                    timestamps = {
+                        "firstSeen" : issueData["firstSeen"],
+                        "lastSeen" : issueData["lastSeen"],
+                        "realTimestamp" : eventData["dateCreated"]
+                    }
+                    payload["contexts"]["timestamps"] = timestamps
+                    environment = None
+                    release = None
 
-                payload["environment"] = environment
-                payload["release"] = release
-            except Exception as e:
+                    for attr in eventData["tags"] : 
+                        if attr["key"] == "environment" :
+                            environment = attr["value"]
+                        if attr["key"] == "release":
+                            release = attr["value"]
+
+                    payload["environment"] = environment
+                    payload["release"] = release
+                except Exception as e:
+                    return {
+                        "error" : f'Could not normalize data - Reason: {str(e)} - Skipping...'
+                    }
+            else:
                 return {
-                    "error" : f'Could not normalize data - Reason: {str(e)} - Skipping...'
+                    "error" : "Event object has no data values - Skipping..."
                 }
         else:
             return {
-                "error" : "Event object has no data values - Skipping..."
+                "error" : "Event does not have type 'exception' or 'stacktrace'"
             }
     else:
         return {
@@ -77,45 +94,48 @@ def normalize_stacktrace(stacktrace, platform):
         "frames" : []
     }
 
+    frames = stacktrace
     if "frames" in stacktrace:
-        for frame in stacktrace["frames"]:
-            obj = {}
-            obj["filename"] = frame["filename"]
-            obj["function"] = frame["function"]
-            obj["lineno"] = frame["lineNo"]
-            obj["colno"] = frame["colNo"]
+        frames = stacktrace["frames"]
+    
+    for frame in frames:
+        obj = {}
+        obj["filename"] = frame["filename"]
+        obj["function"] = frame["function"]
+        obj["lineno"] = frame["lineNo"]
+        obj["colno"] = frame["colNo"]
 
-            if platform == "python":
-                context_all = get_all_context_attr(frame)
-                if context_all is not None:
-                    obj["pre_context"] = context_all["pre_context"]
-                    obj["context_line"] = context_all["context_line"]
-                    obj["post_context"] = context_all["post_context"]
-            
-            if "module" in frame:
-                obj["module"] = frame["module"]
-            if "package" in frame:
-                obj["package"] = frame["package"]
-            if "instructionAddr" in frame:
-                obj["instructionAddr"] = frame["instructionAddr"]
-            if "symbolAddr" in frame:
-                obj["symbolAddr"] = frame["symbolAddr"]
-            if "rawFunction" in frame:
-                obj["rawFunction"] = frame["rawFunction"]
-            if "symbol" in frame:
-                obj["symbol"] = frame["symbol"]
-            if "vars" in frame:
-                obj["vars"] = frame["vars"]
-            if "errors" in frame:
-                obj["errors"] = frame["errors"]
-            if "trust" in frame:
-                obj["trust"] = frame["trust"]
-            if "inApp" in frame:
-                obj["in_app"] = frame["inApp"]
-            if "in_app" in frame and "inApp" not in frame:
-                obj["in_app"] = frame["in_app"]
+        if platform == "python":
+            context_all = get_all_context_attr(frame)
+            if context_all is not None:
+                obj["pre_context"] = context_all["pre_context"]
+                obj["context_line"] = context_all["context_line"]
+                obj["post_context"] = context_all["post_context"]
+        
+        if "module" in frame:
+            obj["module"] = frame["module"]
+        if "package" in frame:
+            obj["package"] = frame["package"]
+        if "instructionAddr" in frame:
+            obj["instructionAddr"] = frame["instructionAddr"]
+        if "symbolAddr" in frame:
+            obj["symbolAddr"] = frame["symbolAddr"]
+        if "rawFunction" in frame:
+            obj["rawFunction"] = frame["rawFunction"]
+        if "symbol" in frame:
+            obj["symbol"] = frame["symbol"]
+        if "vars" in frame:
+            obj["vars"] = frame["vars"]
+        if "errors" in frame:
+            obj["errors"] = frame["errors"]
+        if "trust" in frame:
+            obj["trust"] = frame["trust"]
+        if "inApp" in frame:
+            obj["in_app"] = frame["inApp"]
+        if "in_app" in frame and "inApp" not in frame:
+            obj["in_app"] = frame["in_app"]
 
-            payload["frames"].append(obj)
+        payload["frames"].append(obj)
     
     return payload
 
