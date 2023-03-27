@@ -45,12 +45,12 @@ def filter_issues(issues, filters):
                 try:
                     last_seen = datetime.strptime(issue["lastSeen"], format).date()
                 except ValueError as e:
+                    #print(f'On-prem issue with ID {issue["id"]} had invalid "lastSeen" value {issue["lastSeen"]}')
                     pass
 
             if last_seen is not None and last_seen >= start and last_seen <= end:
                 filtered_issues.append(issue)
-            else:
-                print(f'On-prem issue with ID {issue["id"]} had invalid "lastSeen" value {issue["lastSeen"]}')
+                
     return filtered_issues
 
 def get_issue_attr(event_id, metadata, attr_name):
