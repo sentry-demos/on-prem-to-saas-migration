@@ -86,7 +86,7 @@ class Main:
         if integration_data["external_issue"] is not None:
             saas_integration_id = self.sentry.get_saas_integration_id("JIRA", {"key": "domainName", "value" : integration_data["domain_name"]})
             external_issues_response = self.sentry.update_external_issues(issue_id, integration_data, saas_integration_id)
-            if "id" in external_issues_response and external_issues_response["id"] is not None:
+            if external_issues_response is not None and "id" in external_issues_response and external_issues_response["id"] is not None:
                 self.logger.info(f'SaaS Issue with ID {issue_id} external issues updated succesfully!')
             else:
                 self.logger.error(f'SaaS Issue with ID {issue_id} external issues could not be updated')
@@ -95,9 +95,9 @@ class Main:
 
     def create_issues_on_sass(self, issues):
         metadata = []
-        for issue in issues:
+        for index, issue in enumerate(issues):
             if issue["id"] is not None:
-                self.logger.debug(f'Fetching data from issue with ID {issue["id"]}')
+                self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
                 if "level" in issue:
                     issueData = {
                         "level" : issue["level"] or "error",

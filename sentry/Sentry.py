@@ -104,6 +104,7 @@ class Sentry:
         raise Exception(f'Could not update SaaS issue with ID {issue_id}')
     
     def get_issue_ids_from_events(self, eventIDs):
+        print("Waiting until issues are populated in SaaS...")
         time.sleep(10)
         failed_event_ids = []
         issues = []
@@ -143,10 +144,6 @@ class Sentry:
         raise Exception(f'Could not fetch integrations for issue with ID {issue_id}')
     
     def process_integrations_response(self, integrations, integration_name):
-        print("==========================================================")
-        print(integrations)
-        print("==========================================================")
-
         keys = {
             "domain_name" : None,
             "external_issue" : None
@@ -177,8 +174,8 @@ class Sentry:
         response = request(url, method = "PUT", payload = payload)
         if response is not None and response.status_code in [200,201]:
             return response.json()
-
-        raise Exception(f'Could not update SaaS issue with ID {issue_id} with external issue with ID {integration_data["external_issue"]}')
+        
+        return None
 
     def build_discover_query(self, migration_id):
         url = f'https://{self.saas_options["org_name"]}.sentry.io/issues/?query=+migration_id%3A{migration_id}&referrer=issue-list&statsPeriod=90d'
