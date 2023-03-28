@@ -7,6 +7,7 @@ import dryable
 import members
 import sys
 import uuid
+import json
 
 class Main:
 
@@ -94,6 +95,8 @@ class Main:
             self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
 
     def create_issues_on_sass(self, issues):
+        f = open('./output.json', "w")
+        test_data = []
         metadata = []
         for index, issue in enumerate(issues):
             if issue["id"] is not None:
@@ -149,27 +152,36 @@ class Main:
                     self.logger.warn(f'lastSeen property could not be added to SaaS issue with ID {issue["id"]}')
                 
                 if "assignedTo" in issue and issue["assignedTo"] is not None:
-                  if issue["assignedTo"]["type"] == "team":
-                     team_name = issue["assignedTo"]["name"]
-                     team_id = self.memberObj.getTeamID(team_name)
-                     if team_id is not None:
-                        issue_metadata["assignedBy"] = "assignee_selector"
-                        issue_metadata["assignedTo"] = "team:" + team_id
-                  elif issue["assignedTo"]["type"] == "user":
-                     if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
-                        self.logger.warn(f'Issue assignee\'s email from on-prem issue with ID {issue["id"]} was not found')
-                     else:
-                        userEmail = issue["assignedTo"]["email"]
-                        userId = self.memberObj.getUserID(userEmail)
-                        if userId is not None:
-                           issue_metadata["assignedBy"] = "assignee_selector"
-                           issue_metadata["assignedTo"] = "user:" + userId
+                    if issue["assignedTo"]["type"] == "team":
+                        team_name = issue["assignedTo"]["name"]
+                        team_id = self.memberObj.getTeamID(team_name)
+                        if team_id is not None:
+                            issue_metadata["assignedBy"] = "assignee_selector"
+                            issue_metadata["assignedTo"] = "team:" + team_id
+                    elif issue["assignedTo"]["type"] == "user":
+                        if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
+                            self.logger.warn(f'Issue assignee\'s email from on-prem issue with ID {issue["id"]} was not found')
                         else:
-                           self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
+                            userEmail = issue["assignedTo"]["email"]
+                            userId = self.memberObj.getUserID(userEmail)
+                            if userId is not None:
+                                issue_metadata["assignedBy"] = "assignee_selector"
+                                issue_metadata["assignedTo"] = "user:" + userId
+                            else:
+                                self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
                 else:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 
                 integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
+                
+                obj = {
+                    "issue" : issue,
+                    "event" : latest_event,
+                    "integration_data": integration_data["raw_data"]
+                }
+                test_data.append(obj)
+
+                integration_data = integration_data["keys"]
 
                 if existingIssueID is not None:
                     self.logger.debug(f'Issue already created in SaaS instance with ID {existingIssueID} - Only updating issue with metadata')
@@ -195,6 +207,7 @@ class Main:
             else:
                 raise Exception("Issue ID not found")
 
+        f.write(json.dumps(test_data))
         return metadata
 
     def print_issue_data(self, data):

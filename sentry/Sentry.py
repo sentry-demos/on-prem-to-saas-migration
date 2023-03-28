@@ -153,7 +153,7 @@ class Sentry:
                 if len(integration["externalIssues"]) > 0:
                     keys["domain_name"] = integration["domainName"] or None
                     keys["external_issue"] = integration["externalIssues"][0]["key"] or None
-        return keys
+        return { "keys": keys, "raw_data": integrations }
 
     def get_saas_integration_id(self, integration_name, identifer):
         url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/integrations/?includeConfig=0'
