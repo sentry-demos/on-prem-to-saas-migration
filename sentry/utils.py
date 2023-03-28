@@ -12,8 +12,9 @@ def get_attributes_from_dsn(dsn):
     raise Exception("Could no retrieve project key")
 
 def filter_exception(event_data):
+    valid_types = ["exception", "stacktrace", "threads", "message"]
     for data in event_data:
-        if data["type"] == "exception" or data["type"] == "stacktrace":
+        if data["type"] in valid_types:
             return data
     return []
 

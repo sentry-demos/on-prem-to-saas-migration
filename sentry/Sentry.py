@@ -9,7 +9,7 @@ class Sentry:
 
     def __init__(self):
         load_dotenv()
-        self.request_timeout = 30
+        self.request_timeout = 60
         attributes = utils.get_attributes_from_dsn(os.environ["SAAS_PROJECT_DSN"])
         self.saas_options = {
             "endpoint" : f'https://{attributes.group(2)}/api/',
@@ -112,7 +112,7 @@ class Sentry:
             url = f'{self.saas_options["url"]}projects/{self.saas_options["org_name"]}/{self.saas_options["project_name"]}/events/{eventID}/'
             response = request(url, method = "GET")
             start_time = time.time()
-            if response is not None and response.status_code == 200:
+            if response is not None:
                 data = response.json()
                 while "id" not in data:
                     time_delta = time.time() - start_time
@@ -122,7 +122,7 @@ class Sentry:
                     if time_delta > self.request_timeout:
                         print("Timeout reached")
                         failed_event_ids.append(eventID)
-                        continue
+                        break
 
                 if "groupID" in data:
                     issues.append({
