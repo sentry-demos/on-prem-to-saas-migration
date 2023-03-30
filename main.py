@@ -183,7 +183,7 @@ class Main:
 
                 integration_data = integration_data["keys"]
 
-                if existingIssueID is not None:
+                if existingIssueID is not None and not self.dry_run:
                     self.logger.debug(f'Issue already created in SaaS instance with ID {existingIssueID} - Only updating issue with metadata')
                     self.update_issue_metadata(existingIssueID, issue_metadata, integration_data)
                     return None
