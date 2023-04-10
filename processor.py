@@ -100,10 +100,13 @@ def normalize_tags(tags):
             obj[tag["key"]] = tag["value"]
     return obj
 
-def normalize_stacktrace(stacktrace, platform):
+def normalize_stacktrace(stacktrace, platform): 
     payload = {
         "frames" : []
     }
+
+    if stacktrace is None:
+        return payload
 
     frames = stacktrace
     if "frames" in stacktrace:

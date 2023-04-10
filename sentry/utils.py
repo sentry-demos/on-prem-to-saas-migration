@@ -42,6 +42,7 @@ def filter_issues(issues, filters):
             if issue["id"] is not None and issue["id"] in ids:
                 filtered_issues.append(issue)
         elif filter == "timerange":
+            #print(issue)
             for format in date_formats:
                 try:
                     last_seen = datetime.strptime(issue["lastSeen"], format).date()
@@ -53,6 +54,22 @@ def filter_issues(issues, filters):
                 filtered_issues.append(issue)
                 
     return filtered_issues
+
+def parse_string_date(date):
+    date_formats = ['%Y-%m-%dT%H:%M:%S%fZ', '%Y-%m-%dT%H:%M:%S.%fZ']
+    parsed_date = None
+    try:
+        for format in date_formats:
+            try:
+                parsed_date = datetime.strptime(date, format).date()
+            except ValueError as e:
+                #print(f'On-prem issue with ID {issue["id"]} had invalid "lastSeen" value {issue["lastSeen"]}')
+                continue
+            break
+    except:
+        print("something went wrong")
+    return parsed_date
+
 
 def get_issue_attr(event_id, metadata, attr_name):
     for data in metadata:

@@ -51,10 +51,46 @@ class Sentry:
         raise Exception(f'Could not fetch {self.saas_options["org_name"]} teams')
 
     def get_issues_to_migrate(self, filters):
-        url = f'{self.on_prem_options["url"]}projects/{self.on_prem_options["org_name"]}/{self.on_prem_options["project_name"]}/issues/'
+       
+        issues = []
+
+        if "start" in filters:
+            url = f'{self.on_prem_options["url"]}projects/{self.on_prem_options["org_name"]}/{self.on_prem_options["project_name"]}/issues/'
+            response = self.make_issues_request(url)
+            data = response.json()
+            last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
+            first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
+            not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
+            next = True
+
+            if not_in_range == False:
+                issues = data
+
+            while not_in_range and next:
+                next = response.links.get('next', {}).get('results') == 'true'
+                if next:
+                    url = response.links.get('next', {}).get('url')
+                    response = self.make_issues_request(url)
+                    data = response.json()
+                    issues = issues + data
+                    last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
+                    first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
+                    not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
+
+        elif "issues" in filters and filters["issues"] is not None:
+            base_url = f'{self.on_prem_options["url"]}issues/'
+            for id in filters["issues"]:
+                url = base_url + f'{id}/'
+                response = self.make_issues_request(url)
+                data = response.json()
+                issues.append(data)
+
+        return issues
+
+    def make_issues_request(self, url):
         response = request(url, method = "GET")
         if response is not None and response.status_code == 200:
-            return utils.filter_issues(response.json(), filters)
+            return response
 
         raise Exception(f'Could not get issues from on-prem {self.on_prem_options["project_name"]}')
     
