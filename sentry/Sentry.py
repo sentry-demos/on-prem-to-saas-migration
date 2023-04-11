@@ -65,7 +65,7 @@ class Sentry:
 
             if not_in_range == False:
                 issues = data
-
+            
             while not_in_range and next:
                 next = response.links.get('next', {}).get('results') == 'true'
                 if next:
@@ -76,6 +76,9 @@ class Sentry:
                     last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
                     first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
                     not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
+                elif next == False and len(issues) == 0:
+                    issues = data
+
 
         elif "issues" in filters and filters["issues"] is not None:
             base_url = f'{self.on_prem_options["url"]}issues/'
@@ -85,7 +88,7 @@ class Sentry:
                 data = response.json()
                 issues.append(data)
 
-        return issues
+        return utils.filter_issues(issues, filters)
 
     def make_issues_request(self, url):
         response = request(url, method = "GET")
@@ -109,6 +112,8 @@ class Sentry:
             response = request(url, method = "GET")
             if response is not None and response.status_code == 200:
                 return response.json()
+            else:
+                print(response.json())
 
         raise Exception(f'Could not get latest event from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
 

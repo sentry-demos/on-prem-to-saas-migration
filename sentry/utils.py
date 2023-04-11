@@ -19,16 +19,13 @@ def filter_exception(event_data):
     return []
 
 def filter_issues(issues, filters):
-    if filters is None:
+    if filters is None or "issues" in filters:
         return issues
 
     filtered_issues = []
     filter = None
     last_seen = None
     date_formats = ['%Y-%m-%dT%H:%M:%S%fZ', '%Y-%m-%dT%H:%M:%S.%fZ']
-    if "issues" in filters and filters["issues"] is not None:
-        filter = "ids"
-        ids = filters["issues"]
 
     if "start" in filters and filters["start"] is not None:
         filter = "timerange"
@@ -38,10 +35,7 @@ def filter_issues(issues, filters):
         end = filters["end"]
     
     for issue in issues:
-        if filter == "ids":
-            if issue["id"] is not None and issue["id"] in ids:
-                filtered_issues.append(issue)
-        elif filter == "timerange":
+        if filter == "timerange":
             #print(issue)
             for format in date_formats:
                 try:
