@@ -4,6 +4,7 @@ from request import request
 import dryable
 import os
 import time
+from halo import Halo
 
 class Sentry:
 
@@ -61,12 +62,14 @@ class Sentry:
             last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
             first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
             not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
-            next = True
+            next = response.links.get('next', {}).get('results') == 'true'
+            spinner = Halo(text="Loading", spinner="dots")
 
-            if not_in_range == False:
+            if not_in_range == False or next == False:
                 issues = data
             
             while not_in_range and next:
+                spinner.start()
                 next = response.links.get('next', {}).get('results') == 'true'
                 if next:
                     url = response.links.get('next', {}).get('url')
@@ -76,9 +79,8 @@ class Sentry:
                     last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
                     first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
                     not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
-                elif next == False and len(issues) == 0:
-                    issues = data
 
+            spinner.stop()
 
         elif "issues" in filters and filters["issues"] is not None:
             base_url = f'{self.on_prem_options["url"]}issues/'
@@ -145,7 +147,8 @@ class Sentry:
         raise Exception(f'Could not update SaaS issue with ID {issue_id}')
     
     def get_issue_ids_from_events(self, eventIDs):
-        print("Waiting until issues are populated in SaaS...")
+        spinner = Halo(text="Loading", spinner="dots")
+        spinner.start()
         time.sleep(10)
         failed_event_ids = []
         issues = []
@@ -170,6 +173,7 @@ class Sentry:
                         "issue_id" : data["groupID"],
                         "event_id" : eventID
                     })
+        spinner.stop()
 
         return {
             "issues" : issues,
