@@ -67,7 +67,7 @@ class Sentry:
 
             if not_in_range == False or next == False:
                 issues = data
-            
+
             while not_in_range and next:
                 spinner.start()
                 next = response.links.get('next', {}).get('results') == 'true'
@@ -135,8 +135,10 @@ class Sentry:
         response = request(store_url, method = "POST", payload = event)
         if response is not None and response.status_code == 200:
             return response.json()
+        else:
+            print(response.json())
 
-        raise Exception(f'Could not store new event in SaaS instance')
+        return None
 
     def update_issue(self, issue_id, payload):
         url = f'{self.saas_options["url"]}issues/{issue_id}/'
