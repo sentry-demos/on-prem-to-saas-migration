@@ -100,6 +100,9 @@ class Main:
         metadata = []
         for index, issue in enumerate(issues):
             if issue["id"] is not None:
+                if "type" in issue and issue["type"] == "transaction":
+                        continue
+                    
                 self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
                 if "level" in issue:
                     issueData = {
