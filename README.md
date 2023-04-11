@@ -70,3 +70,8 @@ There are 2 ways that you can specify the criteria that are used to fetch issues
 	- `END` = (`YYYY-mm-dd`) ISO end date when issues are going to be fetched from an on-prem instance. (If this argument is specified, then the `START` argument has to also be specified)
 
 **NOTE:** Values specified via the CLI will overwrite values specified in an `.env` file
+
+## Things to look out for
+
+- If you are migrating over issue assignee information, make sure that the team or person assigned to a ticket in the on-prem instance also exists on SaaS
+- Might be a good idea to turn spike protection off while the script runs. This is because Sentry might drop some events if the volume ingested goes over the average consumed.
