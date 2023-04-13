@@ -207,10 +207,15 @@ class Main:
                     }
                     metadata.append(obj)
 
+                f.close()
+                f = open('./output.json', "w")
+                f.write(json.dumps(test_data))
+                
+
             else:
                 raise Exception("Issue ID not found")
 
-        f.write(json.dumps(test_data))
+        #f.write(json.dumps(test_data))
         return metadata
 
     def print_issue_data(self, data):
