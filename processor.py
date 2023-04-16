@@ -4,9 +4,48 @@ def normalize_issue(eventData, issueData):
     payload = {}
 
     if eventData is not None and len(eventData["entries"]) > 0:
-        exception = utils.filter_exception(eventData["entries"])
+        entries = utils.filter_exception(eventData["entries"])
 
-        if exception is not None:
+        if len(entries) == 0:
+            return {
+                "error" : "Event does not have type 'exception' or 'stacktrace'"
+            }
+        
+        payload["level"] = issueData["level"]
+        payload["platform"] = eventData["platform"]
+        payload["timestamp"] = eventData["dateCreated"]
+        payload["sdk"] = eventData["sdk"]
+        payload["tags"] = normalize_tags(eventData["tags"])
+        payload["tags"]["onprem_id"] = issueData["id"]
+        payload["tags"]["migration_id"] = issueData["migration_id"]
+        payload["tags"]["firstSeen"] = issueData['firstSeen']
+        payload["tags"]["migrated"] = "true"
+        payload["contexts"] = eventData["contexts"]
+        payload["message"] = eventData["message"] if "message" in eventData else ""
+        timestamps = {
+            "firstSeen" : issueData["firstSeen"],
+            "lastSeen" : issueData["lastSeen"],
+            "realTimestamp" : eventData["dateCreated"]
+        }
+        payload["contexts"]["timestamps"] = timestamps
+        environment = None
+        release = None
+
+        for attr in eventData["tags"] : 
+            if attr["key"] == "environment" :
+                environment = attr["value"]
+            if attr["key"] == "release":
+                release = attr["value"]
+
+        payload["environment"] = environment
+        payload["release"] = release
+
+        if "extra" in eventData:
+            payload["extra"] = eventData["extra"]
+        elif "context" in eventData:
+            payload["extra"] = eventData["context"]
+
+        for exception in entries:
             if exception["type"] == "exception":
                 dataValues = exception["data"]["values"][0] or None
                 if len(eventData["entries"]) > 1:
@@ -40,40 +79,6 @@ def normalize_issue(eventData, issueData):
                         event["stacktrace"] = normalize_stacktrace(event["stacktrace"], eventData["platform"])
                         payload["threads"] = { "values": [event]}
 
-                    payload["level"] = issueData["level"]
-                    payload["platform"] = eventData["platform"]
-                    payload["timestamp"] = eventData["dateCreated"]
-                    payload["sdk"] = eventData["sdk"]
-                    payload["tags"] = normalize_tags(eventData["tags"])
-                    payload["tags"]["onprem_id"] = issueData["id"]
-                    payload["tags"]["migration_id"] = issueData["migration_id"]
-                    payload["tags"]["firstSeen"] = issueData['firstSeen']
-                    payload["tags"]["migrated"] = "true"
-                    payload["contexts"] = eventData["contexts"]
-                    payload["message"] = eventData["message"] if "message" in eventData else ""
-                    timestamps = {
-                        "firstSeen" : issueData["firstSeen"],
-                        "lastSeen" : issueData["lastSeen"],
-                        "realTimestamp" : eventData["dateCreated"]
-                    }
-                    payload["contexts"]["timestamps"] = timestamps
-                    environment = None
-                    release = None
-
-                    for attr in eventData["tags"] : 
-                        if attr["key"] == "environment" :
-                            environment = attr["value"]
-                        if attr["key"] == "release":
-                            release = attr["value"]
-
-                    payload["environment"] = environment
-                    payload["release"] = release
-
-                    if "extra" in eventData:
-                        payload["extra"] = eventData["extra"]
-                    elif "context" in eventData:
-                        payload["extra"] = eventData["context"]
-
                 except Exception as e:
                     return {
                         "error" : f'Could not normalize data - Reason: {str(e)} - Skipping...'
@@ -82,10 +87,6 @@ def normalize_issue(eventData, issueData):
                 return {
                     "error" : "Event object has no data values - Skipping..."
                 }
-        else:
-            return {
-                "error" : "Event does not have type 'exception' or 'stacktrace'"
-            }
     else:
         return {
             "error" : "Event request did not return any data - Skipping..."

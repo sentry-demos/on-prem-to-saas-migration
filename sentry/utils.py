@@ -12,11 +12,12 @@ def get_attributes_from_dsn(dsn):
     raise Exception("Could no retrieve project key")
 
 def filter_exception(event_data):
+    props = []
     valid_types = ["exception", "stacktrace", "threads", "message"]
     for data in event_data:
         if data["type"] in valid_types:
-            return data
-    return []
+            props.append(data)
+    return props
 
 def filter_issues(issues, filters):
     if filters is None or "issues" in filters:
