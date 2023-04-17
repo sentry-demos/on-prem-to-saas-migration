@@ -8,6 +8,7 @@ import members
 import sys
 import uuid
 import json
+import csv
 
 class Main:
 
@@ -33,13 +34,19 @@ class Main:
             self.memberObj.populate_members(self.sentry.get_org_members())
             self.memberObj.populate_teams(self.sentry.get_org_teams())
 
+            '''f = open('./output.json', "w")
+            f.write(json.dumps(self.memberObj.get_teams()))
+            f.close()
+
+            return'''
+
             filters = utils.get_request_filters(sys.argv, self.logger)
             if filters is None:
                 raise Exception("Invalid CLI arguments")
 
             issues = self.sentry.get_issues_to_migrate(filters)
-            if issues is None or len(issues) == 0:
-                raise Exception("Issues list is empty")
+            #if issues is None or len(issues) == 0:
+             #   raise Exception("Issues list is empty")
             
             self.logger.debug(f'Ready to migrate {len(issues)} issues from {self.sentry.get_on_prem_project_name()} to {self.sentry.get_sass_project_name()}')
             metadata = self.create_issues_on_sass(issues)
@@ -63,9 +70,20 @@ class Main:
         
         if len(response["issues"]) == 0:
             self.logger.warn(f'Could not find new IDs in {self.sentry.get_sass_project_name()} SaaS')
-            return
+        else:
+            self.get_issue_metadata(response["issues"], metadata)
 
-        for issue in response["issues"]:
+        if len(response["failed_event_ids"]) > 0:
+            self.logger.debug(f'Retrying failed events {str(response["failed_event_ids"])}')
+            response = self.sentry.get_issue_ids_from_failed_events(response["failed_event_ids"])
+            if len(response["issues"]) == 0:
+                self.logger.warn(f'Could not find new IDs in {self.sentry.get_sass_project_name()} SaaS')
+                return
+            else:
+                self.get_issue_metadata(response["issues"], metadata)
+    
+    def get_issue_metadata(self, issues, metadata):
+        for issue in issues:
             issue_id = issue["issue_id"]
             event_id = issue["event_id"]
             issue_metadata = utils.get_issue_attr(event_id, metadata, "issue_metadata")
@@ -79,7 +97,7 @@ class Main:
     
     def update_issue_metadata(self, issue_id, issue_metadata, integration_data):
         response = self.sentry.update_issue(issue_id, issue_metadata)
-        if "id" in response:
+        if response is not None and "id" in response:
             self.logger.info(f'SaaS Issue with ID {issue_id} metadata updated succesfully!')
         else:
             self.logger.error(f'SaaS Issue with ID {issue_id} metadata could not be updated')
@@ -95,15 +113,25 @@ class Main:
             self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
 
     def create_issues_on_sass(self, issues):
-        f = open('./output.json', "w")
+        f = open('./output_miro.json', "r")
         test_data = []
         metadata = []
-        for index, issue in enumerate(issues):
+        issues_data = json.load(f)
+        issues_data = issues_data[20:50]
+        
+        for index, issue_data in enumerate(issues_data):
+            issue = issue_data["issue"]
+            '''if issue["id"] != "2144568":
+                continue'''
+
+            f.close()
+            f = open('./output.json', "w")
+            f.write(json.dumps(issue_data))
             if issue["id"] is not None:
                 if "type" in issue and issue["type"] == "transaction":
                         continue
                     
-                self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
+                self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues_data)})')
                 if "level" in issue:
                     issueData = {
                         "level" : issue["level"] or "error",
@@ -116,7 +144,8 @@ class Main:
                     self.logger.warn("No level attribute found in issue data object")
 
                 # 2) Get the latest event for each of the issues
-                latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+                #latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+                latest_event = issue_data["event"]
 
                 # 3) Normalize and construct payload to send to SAAS
                 payload = normalize_issue(latest_event, issueData)
@@ -124,10 +153,12 @@ class Main:
                     self.logger.error(payload["error"] if "error" in payload else f'Could not normalize issue payload with ID {issue["id"]} - Skipping...')
                     continue
                 
+                #print(payload)
                 self.logger.info(f'Data normalized correctly for Issue with ID {issue["id"]}')
 
-                existingEvent = self.sentry.get_issue_by_id(issue["id"])
+                #existingEvent = self.sentry.get_issue_by_id(issue["id"])
                 existingIssueID = None
+                existingEvent = { "data": [] }
                 if len(existingEvent["data"]) > 0:
                     existingId = existingEvent["data"][0]["id"]
                     issue_response = self.sentry.get_issue_id_from_event_id(existingId)
@@ -158,6 +189,7 @@ class Main:
                     if issue["assignedTo"]["type"] == "team":
                         team_name = issue["assignedTo"]["name"]
                         team_id = self.memberObj.getTeamID(team_name)
+                        print(team_id)
                         if team_id is not None:
                             issue_metadata["assignedBy"] = "assignee_selector"
                             issue_metadata["assignedTo"] = "team:" + team_id
@@ -175,7 +207,8 @@ class Main:
                 else:
                     self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
 
-                integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
+                #integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
+                integration_data = self.sentry.process_integrations_response(issue_data["integration_data"], "JIRA")
                 
                 obj = {
                     "issue" : issue,
@@ -207,9 +240,9 @@ class Main:
                     }
                     metadata.append(obj)
 
-                f.close()
+                '''f.close()
                 f = open('./output.json', "w")
-                f.write(json.dumps(test_data))
+                f.write(json.dumps(test_data))'''
                 
 
             else:

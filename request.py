@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 def request(url, method, payload = None):
     load_dotenv()
     try:
-        token = os.environ["SAAS_AUTH_TOKEN"] if "sentry.io" in url else os.environ["ON_PREM_AUTH_TOKEN"]
+        token = os.environ["SAAS_AUTH_TOKEN"] if "miro.sentry.io" in url else os.environ["ON_PREM_AUTH_TOKEN"]
         headers = {
                 "Content-Type": "application/json",
             }

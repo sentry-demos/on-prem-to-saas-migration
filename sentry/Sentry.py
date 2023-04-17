@@ -38,16 +38,38 @@ class Sentry:
     def get_org_members(self):
         url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/users/'
         response = request(url, method = "GET")
+        members = []
         if response is not None and response.status_code == 200:
-            return response.json()
+            members = members + response.json()
+            next = response.links.get('next', {}).get('results') == 'true'
+            while next:
+                url = response.links.get('next', {}).get('url')
+                response = self.make_issues_request(url)
+                next = response.links.get('next', {}).get('results') == 'true'
+                data = response.json()
+                members = members + data
+
+            return members
+        
+        print(response.json())
 
         raise Exception(f'Could not fetch {self.saas_options["org_name"]} members')
 
     def get_org_teams(self):
         url = f'{self.saas_options["url"]}organizations/{self.saas_options["org_name"]}/teams/'
         response = request(url, method = "GET")
+        teams = []
         if response is not None and response.status_code == 200:
-            return response.json()
+            teams = teams + response.json()
+            next = response.links.get('next', {}).get('results') == 'true'
+            while next:
+                url = response.links.get('next', {}).get('url')
+                response = self.make_issues_request(url)
+                next = response.links.get('next', {}).get('results') == 'true'
+                data = response.json()
+                teams = teams + data
+
+            return teams
 
         raise Exception(f'Could not fetch {self.saas_options["org_name"]} teams')
 
@@ -73,6 +95,8 @@ class Sentry:
                 next = response.links.get('next', {}).get('results') == 'true'
                 if next:
                     url = response.links.get('next', {}).get('url')
+                    urls = url.split("localhost")
+                    url = urls[0] + 'localhost:9000' + urls[1]
                     response = self.make_issues_request(url)
                     data = response.json()
                     issues = issues + data
@@ -97,6 +121,7 @@ class Sentry:
         if response is not None and response.status_code == 200:
             return response
 
+        print(response.json())
         raise Exception(f'Could not get issues from on-prem {self.on_prem_options["project_name"]}')
     
     def get_issue_by_id(self, issue_id):
@@ -145,8 +170,10 @@ class Sentry:
         response = request(url = url, method = "PUT", payload = payload)
         if response is not None and response.status_code == 200:
             return response.json()
+        else:
+            print(response.json())
         
-        raise Exception(f'Could not update SaaS issue with ID {issue_id}')
+        return None
     
     def get_issue_ids_from_events(self, eventIDs):
         spinner = Halo(text="Loading", spinner="dots")
@@ -180,6 +207,37 @@ class Sentry:
         return {
             "issues" : issues,
             "failed_event_ids" : failed_event_ids
+        }
+
+    def get_issue_ids_from_failed_events(self, eventIDs):
+        spinner = Halo(text="Loading", spinner="dots")
+        spinner.start()
+        url = f'{self.saas_options["url"]}projects/{self.saas_options["org_name"]}/{self.saas_options["project_name"]}/events/'
+        response = request(url, method = "GET")
+        events_metadata = []
+        issues = []
+        if response is not None:
+            data = response.json()
+            for event in data:
+                obj = {
+                    "event_id" : event["eventID"],
+                    "issue_id" : event["groupID"]
+                }
+                events_metadata.append(obj)
+
+        for eventID in eventIDs:
+            issue_id = [obj['issue_id'] for obj in events_metadata if obj['event_id'] == eventID]
+            if issue_id is not None:
+                if len(issue_id) == 1:
+                    issue_id = issue_id[0]
+                obj = {
+                    "issue_id" : issue_id,
+                    "event_id" : eventID
+                }
+                issues.append(obj)
+
+        return {
+            "issues" : issues
         }
 
     def get_integration_data(self, integration_name, issue_id):
@@ -222,6 +280,7 @@ class Sentry:
         if response is not None and response.status_code in [200,201]:
             return response.json()
         
+        print(response.json())
         return None
 
     def build_discover_query(self, migration_id):

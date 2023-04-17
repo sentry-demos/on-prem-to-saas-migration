@@ -45,6 +45,8 @@ def normalize_issue(eventData, issueData):
         elif "context" in eventData:
             payload["extra"] = eventData["context"]
 
+        #print(entries)
+
         for exception in entries:
             if exception["type"] == "exception":
                 dataValues = exception["data"]["values"][0] or None
@@ -70,10 +72,8 @@ def normalize_issue(eventData, issueData):
                         }
                         payload["exception"] = { "values": [error] }
                     elif exception["type"] == "stacktrace":
-                        event = {
-                            "stacktrace" : normalize_stacktrace(dataValues, eventData["platform"])
-                        }
-                        payload["stacktrace"] = { "values": [event]}
+                        stacktrace = normalize_stacktrace(dataValues, eventData["platform"])
+                        payload["stacktrace"] = stacktrace
                     elif exception["type"] == "threads":
                         event = dataValues[0]
                         event["stacktrace"] = normalize_stacktrace(event["stacktrace"], eventData["platform"])
