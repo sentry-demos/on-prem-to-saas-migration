@@ -95,8 +95,6 @@ class Sentry:
                 next = response.links.get('next', {}).get('results') == 'true'
                 if next:
                     url = response.links.get('next', {}).get('url')
-                    urls = url.split("localhost")
-                    url = urls[0] + 'localhost:9000' + urls[1]
                     response = self.make_issues_request(url)
                     data = response.json()
                     issues = issues + data
