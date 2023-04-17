@@ -45,8 +45,6 @@ def normalize_issue(eventData, issueData):
         elif "context" in eventData:
             payload["extra"] = eventData["context"]
 
-        #print(entries)
-
         for exception in entries:
             if exception["type"] == "exception":
                 dataValues = exception["data"]["values"][0] or None

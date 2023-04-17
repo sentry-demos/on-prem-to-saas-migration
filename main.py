@@ -107,7 +107,7 @@ class Main:
             self.logger.debug(f'No external issues linked to Issue with ID {issue_id}')
 
     def create_issues_on_sass(self, issues):
-        f = open('./output.json', "r")
+        f = open('./output.json', "w")
         test_data = []
         metadata = []
         
