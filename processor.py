@@ -19,6 +19,7 @@ def normalize_issue(eventData, issueData):
         payload["tags"]["onprem_id"] = issueData["id"]
         payload["tags"]["migration_id"] = issueData["migration_id"]
         payload["tags"]["firstSeen"] = issueData['firstSeen']
+        payload["tags"]["firstRelease"] = issueData["firstRelease"]
         payload["tags"]["migrated"] = "true"
         payload["contexts"] = eventData["contexts"]
         payload["message"] = eventData["message"] if "message" in eventData else ""

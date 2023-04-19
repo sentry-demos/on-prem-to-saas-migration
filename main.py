@@ -117,19 +117,23 @@ class Main:
                         continue
                     
                 self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
+
+                # 2) Get the latest event for each of the issues
+                latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+                releases = self.sentry.get_issue_releases(issue["id"])
+
                 if "level" in issue:
                     issueData = {
                         "level" : issue["level"] or "error",
                         "firstSeen" : issue["firstSeen"],
                         "lastSeen" : issue["lastSeen"],
+                        "firstRelease": releases["firstRelease"]["shortVersion"],
+                        "lastRelease": releases["lastRelease"]["shortVersion"],
                         "id" : issue["id"],
                         "migration_id" : str(self.migration_id)
                     }
                 else:
                     self.logger.warn("No level attribute found in issue data object")
-
-                # 2) Get the latest event for each of the issues
-                latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
 
                 # 3) Normalize and construct payload to send to SAAS
                 payload = normalize_issue(latest_event, issueData)

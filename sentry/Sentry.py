@@ -10,7 +10,7 @@ class Sentry:
 
     def __init__(self):
         load_dotenv()
-        self.request_timeout = 60
+        self.request_timeout = 40
         attributes = utils.get_attributes_from_dsn(os.environ["SAAS_PROJECT_DSN"])
         self.saas_options = {
             "endpoint" : f'https://{attributes.group(2)}/api/',
@@ -141,6 +141,17 @@ class Sentry:
                 print(response.json())
 
         raise Exception(f'Could not get latest event from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
+
+    def get_issue_releases(self, id):
+        if id is not None:
+            url = f'{self.on_prem_options["url"]}issues/{id}/first-last-release/'
+            response = request(url, method = "GET")
+            if response is not None and response.status_code == 200:
+                return response.json()
+            else:
+                print(response.json())
+        
+        raise Exception(f'Could not get release data from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
 
     def get_issue_id_from_event_id(self, event_id):
         if id is not None:
