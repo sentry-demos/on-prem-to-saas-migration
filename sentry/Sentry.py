@@ -225,6 +225,14 @@ class Sentry:
 
         for eventID in eventIDs:
             issue_id = [obj['issue_id'] for obj in events_metadata if obj['event_id'] == eventID]
+            next = response.links.get('next', {}).get('results') == 'true'
+            while next and len(issue_id) == 0:
+                url = response.links.get('next', {}).get('url')
+                response = request(url, method = "GET")
+                next = response.links.get('next', {}).get('results') == 'true'
+                data = response.json()
+                issue_id = [obj["groupID"] for obj in data if obj["eventID"] == eventID]
+
             if issue_id is not None:
                 if len(issue_id) == 1:
                     issue_id = issue_id[0]
