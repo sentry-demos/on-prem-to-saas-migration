@@ -101,6 +101,13 @@ class Sentry:
                     last_event_last_seen = utils.parse_string_date(data[-1]["lastSeen"])
                     first_event_last_seen = utils.parse_string_date(data[0]["lastSeen"])
                     not_in_range = filters["start"] < last_event_last_seen or filters["end"] > first_event_last_seen
+            
+            count = 0
+            while filters["fetch_release"] and count < len(data):
+                base_url = f'{self.on_prem_options["url"]}issues/{data[count]["id"]}/'
+                response = self.make_issues_request(base_url)
+                data[count] = response.json()
+                count = count+1
 
             spinner.stop()
 
@@ -148,10 +155,10 @@ class Sentry:
             response = request(url, method = "GET")
             if response is not None and response.status_code == 200:
                 return response.json()
-            else:
+            elif response.status_code != 404:
                 print(response.json())
         
-        raise Exception(f'Could not get release data from on-prem {self.on_prem_options["org_name"]} with issue ID {id}')
+        return None
 
     def get_issue_id_from_event_id(self, event_id):
         if id is not None:
@@ -275,6 +282,7 @@ class Sentry:
                 if len(integration["externalIssues"]) > 0:
                     keys["domain_name"] = integration["domainName"] or None
                     keys["external_issue"] = integration["externalIssues"][0]["key"] or None
+
         return { "keys": keys, "raw_data": integrations }
 
     def get_saas_integration_id(self, integration_name, identifer):
@@ -303,12 +311,3 @@ class Sentry:
     def build_discover_query(self, migration_id):
         url = f'https://{self.saas_options["org_name"]}.sentry.io/issues/?query=+migration_id%3A{migration_id}&referrer=issue-list&statsPeriod=90d'
         return url
-
-
-
-
-        
-
-
-                
-

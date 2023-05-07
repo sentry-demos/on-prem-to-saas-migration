@@ -81,7 +81,7 @@ def get_dry_run(args):
     return False
 
 def process_cli_args(args, logger):
-    valid_args = ["--dry-run", "--start", "--end", "--issues"]
+    valid_args = ["--dry-run", "--start", "--end", "--issues", "--fetchRelease"]
     if "--help" in args:
         print_help_log()
         return False
@@ -130,6 +130,7 @@ def get_request_filters(cli_args, logger):
     start = None
     end = None
     issues = None
+    fetch_release = False
     date_format = '%Y-%m-%d'
     for arg in cli_args:
         sp = arg.split("=")
@@ -146,6 +147,8 @@ def get_request_filters(cli_args, logger):
                 except ValueError:
                     logger.error(f'Invalid date {sp[1]} - Date should be in YYYY-mm-dd format')
                     return None
+            if "fetchRelease" in sp[0]:
+                fetch_release = sp[1].lower() == "true"
     
     if issues is None:
         if "ISSUES" in os.environ and os.environ["ISSUES"] is not None:
@@ -171,7 +174,8 @@ def get_request_filters(cli_args, logger):
     if issues is not None:
         logger.debug(f'Filtering issues based on list {str(issues)}')
         return {
-            "issues" : issues
+            "issues" : issues,
+            "fetch_release": fetch_release
         }
     if start is not None:
         if end is None:
@@ -187,7 +191,8 @@ def get_request_filters(cli_args, logger):
             logger.debug(f'Filtering issues based on start {start} and end {end}')
             return {
                 "start" : start,
-                "end" : end
+                "end" : end,
+                "fetch_release": fetch_release
             }
     if end is not None:
         logger.error("start argument is required if end was specified")

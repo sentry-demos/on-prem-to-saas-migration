@@ -9,6 +9,7 @@ import sys
 import uuid
 import json
 import csv
+import os, sys
 
 class Main:
 
@@ -112,131 +113,136 @@ class Main:
         metadata = []
         
         for index, issue in enumerate(issues):
-            if issue["id"] is not None:
-                if "type" in issue and issue["type"] == "transaction":
+            try:
+                if issue["id"] is not None:
+                    if "type" in issue and issue["type"] == "transaction":
+                            continue
+                        
+                    self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
+
+                    release = {}
+                    if "firstRelease" in issue:
+                        release["first"] = issue["firstRelease"]["version"] if "version" in issue["firstRelease"] else None
+                    else:
+                        releasesResponse = self.sentry.get_issue_releases(issue["id"])
+                        if releasesResponse is not None and len(releasesResponse) != 0:
+                            release["first"] = releasesResponse["firstRelease"]["shortVersion"]
+
+                    # 2) Get the latest event for each of the issues
+                    latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+
+                    if "level" in issue:
+                        issueData = {
+                            "level" : issue["level"] or "error",
+                            "firstSeen" : issue["firstSeen"],
+                            "lastSeen" : issue["lastSeen"],
+                            "release" : release,
+                            "id" : issue["id"],
+                            "migration_id" : str(self.migration_id)
+                        }
+                    else:
+                        self.logger.warn("No level attribute found in issue data object")
+
+                    # 3) Normalize and construct payload to send to SAAS
+                    payload = normalize_issue(latest_event, issueData)
+                    if ("error" in payload) or ("exception" in payload and payload["exception"] is None):
+                        self.logger.error(payload["error"] if "error" in payload else f'Could not normalize issue payload with ID {issue["id"]} - Skipping...')
                         continue
                     
-                self.logger.debug(f'Fetching data from issue with ID {issue["id"]} ({index+1}/{len(issues)})')
+                    self.logger.info(f'Data normalized correctly for Issue with ID {issue["id"]}')
 
-                release = {}
-                if "firstRelease" in issue:
-                    release["first"] = issue["firstRelease"]["version"] if "version" in issue["firstRelease"] else None
-                else:
-                    releasesResponse = self.sentry.get_issue_releases(issue["id"])
-                    if releasesResponse is None and len(releasesResponse) != 0:
-                        release["first"] = releasesResponse["firstRelease"]["shortVersion"]
+                    existingEvent = self.sentry.get_issue_by_id(issue["id"])
+                    existingIssueID = None
+                    if len(existingEvent["data"]) > 0:
+                        existingId = existingEvent["data"][0]["id"]
+                        issue_response = self.sentry.get_issue_id_from_event_id(existingId)
+                        if "groupID" in issue_response:
+                            existingIssueID = issue_response["groupID"]
 
-                # 2) Get the latest event for each of the issues
-                latest_event = self.sentry.get_latest_event_from_issue(issue["id"])
+                    else:
+                        eventResponse = self.sentry.store_event(payload)
 
-                if "level" in issue:
-                    issueData = {
-                        "level" : issue["level"] or "error",
-                        "firstSeen" : issue["firstSeen"],
-                        "lastSeen" : issue["lastSeen"],
-                        "release" : release,
-                        "id" : issue["id"],
-                        "migration_id" : str(self.migration_id)
+                        if not self.dry_run and (eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None):
+                            self.logger.error(f'Could not store new event in SaaS instance - Skipping...')
+                            continue
+
+                    issue_metadata = {}
+                    integration_data = {}
+
+                    if "firstSeen" in issue and issue["firstSeen"] is not None:
+                        issue_metadata["firstSeen"] = issue["firstSeen"]
+                    else:
+                        self.logger.warn(f'firstSeen property could not be added to SaaS issue with ID {issue["id"]}')
+                    
+                    if "lastSeen" in issue and issue["lastSeen"] is not None:
+                        issue_metadata["lastSeen"] = issue["lastSeen"]
+                    else:
+                        self.logger.warn(f'lastSeen property could not be added to SaaS issue with ID {issue["id"]}')
+                    
+                    if "assignedTo" in issue and issue["assignedTo"] is not None:
+                        if issue["assignedTo"]["type"] == "team":
+                            team_name = issue["assignedTo"]["name"]
+                            team_id = self.memberObj.getTeamID(team_name)
+                            if team_id is not None:
+                                issue_metadata["assignedBy"] = "assignee_selector"
+                                issue_metadata["assignedTo"] = "team:" + team_id
+                        elif issue["assignedTo"]["type"] == "user":
+                            if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
+                                self.logger.warn(f'Issue assignee\'s email from on-prem issue with ID {issue["id"]} was not found')
+                            else:
+                                userEmail = issue["assignedTo"]["email"]
+                                userId = self.memberObj.getUserID(userEmail)
+                                if userId is not None:
+                                    issue_metadata["assignedBy"] = "assignee_selector"
+                                    issue_metadata["assignedTo"] = "user:" + userId
+                                else:
+                                    self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
+                    else:
+                        self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
+
+                    integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
+                    
+                    obj = {
+                        "issue" : issue,
+                        "event" : latest_event,
+                        "integration_data": integration_data["raw_data"]
                     }
-                else:
-                    self.logger.warn("No level attribute found in issue data object")
+                    test_data.append(obj)
 
-                # 3) Normalize and construct payload to send to SAAS
-                payload = normalize_issue(latest_event, issueData)
-                if ("error" in payload) or ("exception" in payload and payload["exception"] is None):
-                    self.logger.error(payload["error"] if "error" in payload else f'Could not normalize issue payload with ID {issue["id"]} - Skipping...')
-                    continue
-                
-                self.logger.info(f'Data normalized correctly for Issue with ID {issue["id"]}')
+                    integration_data = integration_data["keys"]
 
-                existingEvent = self.sentry.get_issue_by_id(issue["id"])
-                existingIssueID = None
-                if len(existingEvent["data"]) > 0:
-                    existingId = existingEvent["data"][0]["id"]
-                    issue_response = self.sentry.get_issue_id_from_event_id(existingId)
-                    if "groupID" in issue_response:
-                        existingIssueID = issue_response["groupID"]
-
-                else:
-                    eventResponse = self.sentry.store_event(payload)
-
-                    if not self.dry_run and (eventResponse is None or "id" not in eventResponse or eventResponse["id"] is None):
-                        self.logger.error(f'Could not store new event in SaaS instance - Skipping...')
+                    if existingIssueID is not None and not self.dry_run:
+                        self.logger.debug(f'Issue already created in SaaS instance with ID {existingIssueID} - Only updating issue with metadata')
+                        self.update_issue_metadata(existingIssueID, issue_metadata, integration_data)
                         continue
 
-                issue_metadata = {}
-                integration_data = {}
+                    if self.dry_run:
+                        obj = {
+                            "issue_skeleton" : payload,
+                            "issue_metadata" : issue_metadata,
+                            "integration_data" : integration_data
+                        }
+                        metadata.append(obj)
+                    else:
+                        self.logger.info(f'Issue successfully created in SaaS instance with ID {eventResponse["id"]}')
+                        obj = {
+                            "event_id" : eventResponse["id"],
+                            "issue_metadata" : issue_metadata,
+                            "integration_data" : integration_data
+                        }
+                        metadata.append(obj)
 
-                if "firstSeen" in issue and issue["firstSeen"] is not None:
-                    issue_metadata["firstSeen"] = issue["firstSeen"]
+                    f.close()
+                    f = open('./output.json', "w")
+                    f.write(json.dumps(test_data))
+                    
+
                 else:
-                    self.logger.warn(f'firstSeen property could not be added to SaaS issue with ID {issue["id"]}')
-                
-                if "lastSeen" in issue and issue["lastSeen"] is not None:
-                    issue_metadata["lastSeen"] = issue["lastSeen"]
-                else:
-                    self.logger.warn(f'lastSeen property could not be added to SaaS issue with ID {issue["id"]}')
-                
-                if "assignedTo" in issue and issue["assignedTo"] is not None:
-                    if issue["assignedTo"]["type"] == "team":
-                        team_name = issue["assignedTo"]["name"]
-                        team_id = self.memberObj.getTeamID(team_name)
-                        if team_id is not None:
-                            issue_metadata["assignedBy"] = "assignee_selector"
-                            issue_metadata["assignedTo"] = "team:" + team_id
-                    elif issue["assignedTo"]["type"] == "user":
-                        if "email" not in issue["assignedTo"] or issue["assignedTo"]["email"] is None:
-                            self.logger.warn(f'Issue assignee\'s email from on-prem issue with ID {issue["id"]} was not found')
-                        else:
-                            userEmail = issue["assignedTo"]["email"]
-                            userId = self.memberObj.getUserID(userEmail)
-                            if userId is not None:
-                                issue_metadata["assignedBy"] = "assignee_selector"
-                                issue_metadata["assignedTo"] = "user:" + userId
-                            else:
-                                self.logger.warn(f'Could not find the ID of user with email {userEmail} - Skipping issue assignee')
-                else:
-                    self.logger.warn(f'On-prem issue with ID {issue["id"]} does not contain property "assignedTo" - Skipping issue assignee')
-
-                integration_data = self.sentry.get_integration_data("JIRA", issue["id"])
-                
-                obj = {
-                    "issue" : issue,
-                    "event" : latest_event,
-                    "integration_data": integration_data["raw_data"]
-                }
-                test_data.append(obj)
-
-                integration_data = integration_data["keys"]
-
-                if existingIssueID is not None and not self.dry_run:
-                    self.logger.debug(f'Issue already created in SaaS instance with ID {existingIssueID} - Only updating issue with metadata')
-                    self.update_issue_metadata(existingIssueID, issue_metadata, integration_data)
-                    continue
-
-                if self.dry_run:
-                    obj = {
-                        "issue_skeleton" : payload,
-                        "issue_metadata" : issue_metadata,
-                        "integration_data" : integration_data
-                    }
-                    metadata.append(obj)
-                else:
-                    self.logger.info(f'Issue successfully created in SaaS instance with ID {eventResponse["id"]}')
-                    obj = {
-                        "event_id" : eventResponse["id"],
-                        "issue_metadata" : issue_metadata,
-                        "integration_data" : integration_data
-                    }
-                    metadata.append(obj)
-
-                f.close()
-                f = open('./output.json', "w")
-                f.write(json.dumps(test_data))
-                
-
-            else:
-                raise Exception("Issue ID not found")
+                    raise Exception("Issue ID not found")
+            except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(exc_type, fname, exc_tb.tb_lineno)
 
         #f.write(json.dumps(test_data))
         return metadata
