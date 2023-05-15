@@ -20,5 +20,5 @@ done
 if [ $dry == "True" ]; then
     python3 main.py --dry-run $([ -n "$issues" ] && echo "--issues=$issues") $([ -n "$start" ] && echo "--start=$start") $([ -n "$end" ] && echo "--end=$end") $([ -n "$fetchRelease" ] && echo "--fetchRelease=$fetchRelease")
 else
-    python3 main.py $([ -n "$issues" ] && echo "--issues=$issues") $([ -n "$start" ] && echo "--start=$start") $([ -n "$end" ] && echo "--end=$end")
+    python3 main.py $([ -n "$issues" ] && echo "--issues=$issues") $([ -n "$start" ] && echo "--start=$start") $([ -n "$end" ] && echo "--end=$end") $([ -n "$fetchRelease" ] && echo "--fetchRelease=$fetchRelease")
 fi
